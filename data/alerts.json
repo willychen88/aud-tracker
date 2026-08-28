@@ -1,0 +1,6 @@
+{
+  "below": [21.0, 21.5, 22.0],
+  "above": [23.0, 23.5, 24.0],
+  "ma_cross": true,
+  "last_alerted": {}
+}
