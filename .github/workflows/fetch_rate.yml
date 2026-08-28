@@ -1,0 +1,42 @@
+name: Fetch AUD/TWD Rate
+
+on:
+  schedule:
+    # Run every 4 hours (6 times a day)
+    # Times in UTC: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+    # = Melbourne AEST: 10:00, 14:00, 18:00, 22:00, 02:00, 06:00
+    - cron: '0 */4 * * *'
+  
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch rate and check alerts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python fetch_rate.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name "AUD Tracker Bot"
+          git config user.email "bot@aud-tracker.local"
+          git add data/
+          # Only commit if there are changes
+          git diff --staged --quiet || git commit -m "📊 Update rate data — $(date -u +%Y-%m-%dT%H:%M)"
+          git push
