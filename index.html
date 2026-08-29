@@ -227,7 +227,8 @@ async function loadData(){
   try{const r=await fetch(LIVE_API);if(r.ok){const d=await r.json();currentRate=d.rates.TWD}}catch(e){
     try{const r=await fetch(FALLBACK_API);if(r.ok){const d=await r.json();currentRate=d.rates.TWD}}catch(e2){}}
   if(!currentRate&&allData.length)currentRate=allData[allData.length-1].rate;
-  if(allData.length<3){allData=genDemo(90);if(!currentRate)currentRate=allData[allData.length-1].rate}
+  if(!currentRate)currentRate=22.78;
+  if(allData.length<3)allData=genDemo(90);
   render();
 }
 function genDemo(n){const d=[];let r=currentRate||22.78;const now=new Date();for(let i=n;i>=0;i--){const dt=new Date(now);dt.setDate(dt.getDate()-i);r+=(Math.random()-.48)*.12;r=Math.max(21.5,Math.min(23.5,r));d.push({date:dt.toISOString().slice(0,10),rate:+r.toFixed(4),timestamp:dt.toISOString()})}if(currentRate)d[d.length-1].rate=currentRate;return d}
@@ -334,7 +335,7 @@ function updateCompare(){
   let th=`<tr><th>#</th><th>管道</th><th>到手${u}</th><th>差距</th></tr>`;
   const rows=results.map((ch,i)=>{const v=isAUD?ch.result.received.toFixed(2):Math.round(ch.result.received).toLocaleString();
     const diff=i===0?'—':('-'+pf+(isAUD?(results[0].result.received-ch.result.received).toFixed(2):Math.round(results[0].result.received-ch.result.received).toLocaleString()));
-    return`<tr><td><span class="rank rank-${Math.min(i+1,3)}">${i+1}</span></td><td>${ch.emoji} ${ch.name}${ch.est?' <span class="est">估</span>':''}</td><td style="font-weight:600">${pf}${v}</td><td style="color:${i===0?'var(--green)':'var(--red)'">${diff}</td></tr>`}).join('');
+    const clr=i===0?'var(--green)':'var(--red)';return`<tr><td><span class="rank rank-${Math.min(i+1,3)}">${i+1}</span></td><td>${ch.emoji} ${ch.name}${ch.est?' <span class="est">估</span>':''}</td><td style="font-weight:600">${pf}${v}</td><td style="color:${clr}">${diff}</td></tr>`}).join('');
   document.getElementById('sumTable').innerHTML=th+rows;
 
   // Detail cards
