@@ -253,14 +253,16 @@ async function loadData(){
   render();
 }
 function genDemo(n){const d=[];let r=currentRate||22.78;const now=new Date();for(let i=n;i>=0;i--){const dt=new Date(now);dt.setDate(dt.getDate()-i);r+=(Math.random()-.48)*.12;r=Math.max(21.5,Math.min(23.5,r));d.push({date:dt.toISOString().slice(0,10),rate:+r.toFixed(4),timestamp:dt.toISOString()})}if(currentRate)d[d.length-1].rate=currentRate;return d}
-function ma(d,n){const s=d.slice(-n);return s.length?+(s.reduce((a,x)=>a+x.rate,0)/s.length).toFixed(4):null}
+// Estimate entries per day from data
+function epd(){if(allData.length<2)return 1;const first=new Date(allData[0].timestamp||allData[0].date),last=new Date(allData[allData.length-1].timestamp||allData[allData.length-1].date);const days=Math.max(1,(last-first)/864e5);return Math.round(allData.length/days)}
+function ma(d,days){const n=days*epd();const s=d.slice(-n);return s.length>1?+(s.reduce((a,x)=>a+x.rate,0)/s.length).toFixed(4):null}
 function pct(d,r){return +(d.filter(x=>x.rate<r).length/d.length*100).toFixed(1)}
 function nextRBA(){const n=new Date();for(const d of RBA){const dt=new Date(d);if(dt>n)return Math.ceil((dt-n)/864e5)}return'--'}
 
 function render(){
   if(!currentRate)return;const r=currentRate,m30=ma(allData,30),m90=ma(allData,90),p=pct(allData,r);
-  const prev=allData.length>6?allData[allData.length-7].rate:allData[0].rate,chg=r-prev;
-  const d90=allData.slice(-90),hi=Math.max(...d90.map(x=>x.rate)),lo=Math.min(...d90.map(x=>x.rate));
+  const e=epd(),prev7=allData.length>7*e?allData[allData.length-7*e].rate:allData[0].rate,chg=r-prev7;
+  const d90=allData.slice(-90*e),hi=Math.max(...d90.map(x=>x.rate)),lo=Math.min(...d90.map(x=>x.rate));
   document.getElementById('hRate').textContent=r.toFixed(4);
   const hc=document.getElementById('hChange');hc.textContent=`${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(4)} (7d)`;hc.className='header-change '+(chg>=0?'up':'down');
   document.getElementById('hPct').textContent=p+'%';
@@ -274,14 +276,14 @@ function render(){
 }
 
 function renderChart(days){
-  const sl=allData.slice(-days),st=Math.max(1,Math.floor(sl.length/60)),sam=sl.filter((_,i)=>i%st===0||i===sl.length-1);
-  const lb=sam.map(d=>{const t=new Date(d.date);return`${t.getMonth()+1}/${t.getDate()}`}),rt=sam.map(d=>d.rate),m30=ma(allData,30),m90=ma(allData,90);
+  const e=epd(),sl=allData.slice(-days*e),st=Math.max(1,Math.floor(sl.length/60)),sam=sl.filter((_,i)=>i%st===0||i===sl.length-1);
+  const lb=sam.map(d=>`${d.date.slice(5,7)}/${d.date.slice(8,10)}`),rt=sam.map(d=>d.rate),m30v=ma(allData,30),m90v=ma(allData,90);
   if(chart)chart.destroy();const ctx=document.getElementById('rateChart').getContext('2d');
   const g=ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,'rgba(26,26,46,.12)');g.addColorStop(1,'rgba(26,26,46,0)');
   chart=new Chart(ctx,{type:'line',data:{labels:lb,datasets:[{data:rt,borderColor:'#1a1a2e',borderWidth:2,backgroundColor:g,fill:true,pointRadius:0,tension:.3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxRotation:0,maxTicksLimit:5,font:{size:10},color:'#999'}},y:{grid:{color:'#f0f0f0'},ticks:{font:{size:10},color:'#999',callback:v=>v.toFixed(1)}}}},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxRotation:0,maxTicksLimit:5,font:{size:10},color:'#999'}},y:{grid:{color:'#f0f0f0'},ticks:{font:{size:10},color:'#999',callback:v=>v.toFixed(2)}}}},
     plugins:[{id:'ma',afterDraw(c){const{ctx:x,chartArea:{left:l,right:r},scales:{y}}=c;
-      [m30&&['#64b5f6',m30],m90&&['#ffb74d',m90]].filter(Boolean).forEach(([col,val])=>{const yp=y.getPixelForValue(val);x.save();x.setLineDash([4,4]);x.strokeStyle=col;x.lineWidth=1;x.beginPath();x.moveTo(l,yp);x.lineTo(r,yp);x.stroke();x.restore()})}}]});
+      [m30v&&['#64b5f6',m30v],m90v&&['#ffb74d',m90v]].filter(Boolean).forEach(([col,val])=>{const yp=y.getPixelForValue(val);x.save();x.setLineDash([4,4]);x.strokeStyle=col;x.lineWidth=1;x.beginPath();x.moveTo(l,yp);x.lineTo(r,yp);x.stroke();x.restore()})}}]});
 }
 function renderRangeChips(){document.getElementById('rangeChips').innerHTML=[[7,'7天'],[30,'30天'],[90,'90天'],[180,'半年']].map(([d,l])=>`<button class="chip ${d===30?'active':''}" onclick="document.querySelectorAll('#rangeChips .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderChart(${d})">${l}</button>`).join('')}
 
