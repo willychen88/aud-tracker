@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AUD/TWD 匯率追蹤器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--sub:#6e6e73;--accent:#0071e3;--green:#34c759;--red:#ff3b30;--orange:#ff9500;--blue:#007aff;--border:#e5e5ea;--radius:14px}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif;background:var(--bg);color:var(--text);max-width:480px;margin:0 auto;min-height:100vh;-webkit-font-smoothing:antialiased}
+  .header{background:linear-gradient(145deg,#1a1a2e,#0f3460);color:#fff;padding:28px 20px 18px}
+  .header-label{font-size:11px;letter-spacing:1.5px;color:#8892b0;text-transform:uppercase;margin-bottom:2px}
+  .header-rate{font-size:44px;font-weight:700;letter-spacing:-2px;line-height:1.1}
+  .header-change{display:inline-block;font-size:13px;font-weight:600;padding:2px 10px;border-radius:20px;margin-top:6px}
+  .header-change.up{background:rgba(52,199,89,0.2);color:#81c784}.header-change.down{background:rgba(255,59,48,0.2);color:#ff6b6b}
+  .header-stats{display:flex;gap:14px;margin-top:12px;font-size:12px;color:#8892b0}.header-stats strong{color:#fff}
+  .header-time{font-size:10px;color:#555b73;margin-top:8px}
+  .nav{display:flex;background:var(--card);border-bottom:1px solid var(--border);padding:0 12px;position:sticky;top:0;z-index:10}
+  .nav-btn{flex:1;padding:12px 4px 10px;border:none;background:none;font-size:13px;font-weight:500;color:var(--sub);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+  .nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+  .card{background:var(--card);border-radius:var(--radius);padding:16px;margin:10px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .card-title{font-size:12px;color:var(--sub);margin-bottom:10px;font-weight:500}
+  .chips{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+  .chip{padding:5px 14px;border-radius:20px;border:1px solid var(--border);font-size:12px;background:var(--card);color:var(--sub);cursor:pointer;font-weight:500;transition:all .15s}
+  .chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 16px}
+  .stat-card{background:var(--card);border-radius:12px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .stat-label{font-size:11px;color:var(--sub);margin-bottom:4px}.stat-value{font-size:22px;font-weight:700}
+  .pct-bar{position:relative;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--green) 0%,#ffd93d 50%,var(--red) 100%)}
+  .pct-dot{position:absolute;top:-5px;width:18px;height:18px;border-radius:50%;background:var(--text);border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transform:translateX(-50%)}
+  .pct-labels{display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-top:6px}
+  .heatmap-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .heatmap-day-label{font-size:9px;color:var(--sub);text-align:center;padding:2px 0}
+  .heatmap-cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center}.heatmap-cell .day-num{font-size:10px;font-weight:600;color:#fff}
+  .dir-toggle{display:flex;border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:14px}
+  .dir-btn{flex:1;padding:10px 8px;border:none;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+  .dir-btn.active{background:var(--text);color:#fff}.dir-btn:not(.active){background:var(--card);color:var(--sub)}
+  .amt-row{display:flex;align-items:center;gap:8px}
+  .amt-prefix{font-size:22px;font-weight:700;color:var(--text)}
+  .amt-input{font-size:22px;font-weight:700;border:none;outline:none;background:transparent;width:100%;color:var(--text)}
+  .amt-presets{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+  .amt-preset{padding:4px 12px;border-radius:16px;border:1px solid var(--border);font-size:11px;background:var(--card);color:var(--sub);cursor:pointer;font-weight:500}
+  .amt-preset.active{background:var(--text);color:#fff;border-color:var(--text)}
+  .ch-card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.04);border:1px solid var(--border)}
+  .ch-card.best{border:2px solid var(--green)}
+  .ch-name{font-size:14px;font-weight:600}
+  .ch-badge{font-size:10px;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-weight:600}
+  .ch-received-label{font-size:11px;color:var(--sub);margin-top:10px}
+  .ch-received{font-size:28px;font-weight:700}.ch-received.best-val{color:#2e7d32}
+  .ch-breakdown{margin-top:10px;border-top:1px solid #f0f0f0;padding-top:8px}
+  .ch-fee-row{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);padding:2px 0}.ch-fee-row span:last-child{font-weight:500}
+  .ch-diff{font-size:12px;color:var(--red);font-weight:500;margin-top:6px}
+  .ch-threshold{font-size:11px;color:var(--orange);font-weight:500;margin-top:4px;padding:6px 10px;background:#fff8e1;border-radius:8px}
+  .disclaimer{margin:16px;padding:12px;background:#f9f9f9;border-radius:10px;border:1px solid var(--border);font-size:11px;color:var(--sub);line-height:1.5}
+  .disclaimer .ub{display:inline-block;background:#e3f2fd;color:#1565c0;padding:1px 8px;border-radius:8px;font-size:10px;font-weight:600;margin-bottom:4px}
+  .footer{text-align:center;font-size:11px;color:#bbb;padding:8px 16px 32px}
+  .tab-content{display:none;padding-bottom:16px}.tab-content.active{display:block}
+  .stale-badge{display:inline-block;background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600}
+  .adj-input{width:80px;font-size:14px;font-weight:600;padding:4px 8px;border:1px solid var(--border);border-radius:6px;text-align:center}
+  .info-box{font-size:11px;color:var(--sub);line-height:1.5;padding:8px 10px;background:#f7f8fa;border-radius:8px;margin-top:6px}
+  .info-box strong{color:var(--text)}
+  .sum-table{width:100%;border-collapse:collapse;font-size:11px}
+  .sum-table th{text-align:left;padding:6px 4px;color:var(--sub);font-weight:500;border-bottom:1px solid var(--border);font-size:10px}
+  .sum-table td{padding:6px 4px;border-bottom:1px solid #f5f5f5}
+  .sum-table tr:first-child td{font-weight:700;color:#2e7d32}
+  .rank{display:inline-block;width:18px;height:18px;border-radius:50%;text-align:center;line-height:18px;font-size:10px;font-weight:700;margin-right:4px}
+  .rank-1{background:#e8f5e9;color:#2e7d32}.rank-2,.rank-3{background:#f5f5f5;color:#999}
+  .rate-sim input[type=range]{flex:1;accent-color:var(--accent)}
+  .rate-sim-result{display:flex;gap:12px;margin-top:12px}
+  .rate-sim-box{flex:1;background:#f7f8fa;border-radius:10px;padding:12px;text-align:center}
+  .rate-sim-box .label{font-size:11px;color:var(--sub);margin-bottom:4px}
+  .rate-sim-box .val{font-size:20px;font-weight:700}
+  .est{font-size:9px;color:var(--orange);font-weight:500}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-label">AUD / TWD 匯率追蹤器</div>
+  <div class="header-rate" id="hRate">--</div>
+  <div class="header-change" id="hChange">--</div>
+  <div class="header-stats">
+    <span>百分位 <strong id="hPct">--%</strong></span>
+    <span>MA30 <strong id="hMA30" style="color:#64b5f6">--</strong></span>
+    <span>MA90 <strong id="hMA90" style="color:#ffb74d">--</strong></span>
+  </div>
+  <div class="header-time" id="hTime"></div>
+</div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="switchTab('dashboard')">📊 走勢</button>
+  <button class="nav-btn" onclick="switchTab('calc')">🧮 計算機</button>
+  <button class="nav-btn" onclick="switchTab('compare')">⚖️ 比價</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="tab-dashboard" class="tab-content active">
+  <div class="card">
+    <div class="chips" id="rangeChips"></div>
+    <canvas id="rateChart" height="200"></canvas>
+    <div style="display:flex;justify-content:center;gap:16px;font-size:11px;color:#888;margin-top:8px">
+      <span><span style="display:inline-block;width:14px;height:2px;background:#64b5f6;vertical-align:middle;margin-right:4px"></span>MA30</span>
+      <span><span style="display:inline-block;width:14px;height:2px;background:#ffb74d;vertical-align:middle;margin-right:4px"></span>MA90</span>
+    </div>
+    <div class="info-box">MA30/MA90 = 過去 30/90 天均價。現在 < MA → 偏便宜。</div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label">90天最高</div><div class="stat-value" id="sHigh90" style="color:var(--red)">--</div></div>
+    <div class="stat-card"><div class="stat-label">90天最低</div><div class="stat-value" id="sLow90" style="color:var(--green)">--</div></div>
+    <div class="stat-card"><div class="stat-label">歷史百分位</div><div class="stat-value" id="sPct">--</div></div>
+    <div class="stat-card"><div class="stat-label">RBA 下次會議</div><div class="stat-value" id="sRBA" style="color:var(--blue)">--</div></div>
+  </div>
+  <div class="card"><div class="card-title">百分位</div><div class="pct-bar"><div class="pct-dot" id="pctDot"></div></div><div class="pct-labels"><span>便宜</span><span>中間</span><span>偏貴</span></div></div>
+  <div class="card">
+    <div class="card-title">月曆熱力圖</div>
+    <div id="heatmapMonth" style="text-align:center;font-weight:600;margin-bottom:8px"></div>
+    <div class="heatmap-grid" id="heatmap"></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--sub);margin-top:8px"><span>🟢 低</span><span>🔴 高</span></div>
+  </div>
+</div>
+
+<!-- CALCULATOR -->
+<div id="tab-calc" class="tab-content">
+  <div style="padding:0 16px;margin-top:10px">
+    <div class="dir-toggle" id="calcDirToggle">
+      <button class="dir-btn active" onclick="setDir('tw2au')">🇹🇼 → 🇦🇺</button>
+      <button class="dir-btn" onclick="setDir('au2tw')">🇦🇺 → 🇹🇼</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title" id="calcAmtLabel">匯款金額 (TWD)</div>
+    <div class="amt-row"><span class="amt-prefix" id="calcPrefix">NT$</span><input class="amt-input" id="calcAmt" type="number" value="200000" oninput="updateCalc()"></div>
+    <div class="amt-presets" id="calcPresets"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">匯率試算 — 拖動或輸入匯率</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <input type="range" id="rateSlider" min="20" max="25" step="0.01" style="flex:1;accent-color:var(--accent)" oninput="document.getElementById('rateInput').value=this.value;updateCalc()">
+      <input class="adj-input" id="rateInput" type="number" step="0.01" style="width:75px;font-size:16px" oninput="document.getElementById('rateSlider').value=this.value;updateCalc()">
+    </div>
+    <div class="rate-sim-result">
+      <div class="rate-sim-box"><div class="label">現在 <span id="simNowR"></span></div><div class="val" id="simNowV"></div></div>
+      <div class="rate-sim-box"><div class="label">假設 <span id="simIfR"></span></div><div class="val" id="simIfV"></div></div>
+    </div>
+    <div id="simDiff" style="text-align:center;font-size:14px;font-weight:700;margin-top:10px;padding:8px;border-radius:8px"></div>
+    <div class="info-box" id="calcRateNote"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">預算影響</div>
+    <div id="budgetImpact" style="font-size:13px;color:#444;line-height:1.6"></div>
+  </div>
+</div>
+
+<!-- COMPARE -->
+<div id="tab-compare" class="tab-content">
+  <div style="padding:0 16px;margin-top:10px">
+    <div class="dir-toggle" id="cmpDirToggle">
+      <button class="dir-btn active" onclick="setDir('tw2au')">🇹🇼 → 🇦🇺 CBA</button>
+      <button class="dir-btn" onclick="setDir('au2tw')">🇦🇺 CBA → 🇹🇼</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title" id="cmpAmtLabel">匯款金額 (TWD)</div>
+    <div class="amt-row"><span class="amt-prefix" id="cmpPrefix">NT$</span><input class="amt-input" id="cmpAmt" type="number" value="200000" oninput="updateCompare()"></div>
+    <div class="amt-presets" id="cmpPresets"></div>
+  </div>
+  <div class="card"><div class="card-title">📋 總表</div><div style="overflow-x:auto"><table class="sum-table" id="sumTable"></table></div></div>
+  <div class="card">
+    <div class="card-title">中轉行費用調整（SHA 適用）</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;color:var(--sub)">中轉行+CBA入帳 (AUD)</span>
+      <input class="adj-input" id="adjIntm" type="number" value="116" oninput="updateCompare()">
+    </div>
+    <div class="info-box">實測值 <strong>AUD 116</strong>（玉山→CBA, 2026/08/27）。CBA 入帳費最高 AUD 11/筆（官方）。每次路徑不同，費用會變。</div>
+  </div>
+  <div id="compareResults" style="padding:0 16px"></div>
+  <div class="card">
+    <div class="card-title">📖 名詞</div>
+    <div class="info-box">
+      <strong>SHA（費用共擔）</strong>：匯款人付台灣端費用，中轉行和收款行的費用從匯款金額扣。到手金額不確定。<br>
+      <strong>OUR（全額到款）</strong>：所有費用由匯款人支付，收款人拿到完整金額。台灣端費用較高。<br>
+      <strong>終點銀行</strong>：CBA Commonwealth Bank of Australia
+    </div>
+  </div>
+  <div class="disclaimer">
+    <span class="ub">費用資料最後更新：2026/08</span><br>
+    ⚠️ 僅供參考，不構成投資建議。實際交易以銀行牌告為準。標示「估」的參數為估計值。
+  </div>
+</div>
+
+<div class="footer">AUD/TWD Tracker v1.0<br>數據每 4 小時更新 · 匯率來源：ECB<br><span id="footerStale"></span></div>
+
+<script>
+const DATA_URL='https://raw.githubusercontent.com/willychen88/aud-tracker/main/data/rates.json';
+const LIVE_API='https://api.frankfurter.dev/latest?from=AUD&to=TWD';
+const FALLBACK_API='https://open.er-api.com/v6/latest/AUD';
+const RBA=['2026-09-30','2026-11-04','2026-12-09'];
+let allData=[],currentRate=null,lastUpdated=null,chart=null,gDir='tw2au';
+
+// Bank spread: sell rate ~0.4% above mid for TW banks, CBA buy rate ~4% below mid (est)
+const BANK_SPREAD=0.004, CBA_SPREAD=0.04;
+
+const CH_TW2AU=[
+  {id:'esun_sha',name:'玉山 SHA',emoji:'🏦',src:'實測',est:false,
+    calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),a=(t-400)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費+郵電費','TWD 400'],['中轉行+CBA入帳','AUD '+i]]}}},
+  {id:'esun_our',name:'玉山 OUR',emoji:'🏦',src:'估算',est:true,
+    calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),a=(t-700)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費+郵電費(×2)','~TWD 700'],['中轉行+CBA','匯款人付']]}}},
+  {id:'tcb_sha',name:'合庫 SHA',emoji:'🏛️',src:'官方',est:true,
+    calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(800,Math.max(100,Math.round(t*.00025))),a=(t-f-300)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費','TWD 300'],['中轉行+CBA入帳','AUD '+i]]}}},
+  {id:'tcb_our',name:'合庫 OUR',emoji:'🏛️',src:'官方',est:true,
+    calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(800,Math.max(100,Math.round(t*.00025))),a=(t-f-600)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費(×2)','TWD 600'],['中轉行+CBA','匯款人付']]}}},
+  {id:'wise',name:'Wise',emoji:'🌐',src:'網路',est:true,
+    calc:(t,r)=>{const f=t*.0075,a=(t-f)/r;return{received:Math.max(0,a),unit:'AUD',rateUsed:r.toFixed(4)+' (中間價)',fees:[['手續費(~0.75%)','TWD '+Math.round(f)+' (估)'],['匯率','中間匯率'],['中轉行','無']]}}}
+];
+const CH_AU2TW=[
+  {id:'cba',name:'CBA App',emoji:'🏦',src:'官方',est:true,
+    calc:(a,r)=>{const br=r*(1-CBA_SPREAD),rf=Math.min(800,Math.max(200,Math.round(a*br*.0005))),t=a*br-rf;return{received:Math.max(0,t),unit:'TWD',rateUsed:br.toFixed(4)+' (CBA買入,估)',fees:[['CBA手續費','AUD 0（App免費）'],['CBA中轉行','AUD 0（CBA吸收）'],['匯率加價','~4% (估)'],['台灣端解匯','TWD '+rf]]}}},
+  {id:'revolut',name:'Revolut',emoji:'💳',src:'網路',est:true,
+    calc:(a,r)=>{const rf=Math.min(800,Math.max(200,Math.round((a-40)*r*.0005))),t=(a-40)*r-rf;return{received:Math.max(0,t),unit:'TWD',rateUsed:r.toFixed(4)+' (中間價)',fees:[['轉帳費','AUD 10'],['中轉行','~AUD 30 (估)'],['匯率','中間匯率(額度內)'],['台灣端解匯','TWD '+rf]]}}},
+  {id:'wise2',name:'Wise',emoji:'🌐',src:'網路',est:true,
+    calc:(a,r)=>{const f=a*.0075,t=(a-f)*r;return{received:Math.max(0,t),unit:'TWD',rateUsed:r.toFixed(4)+' (中間價)',fees:[['手續費(~0.75%)','AUD '+f.toFixed(2)+' (估)'],['匯率','中間匯率'],['中轉行','無'],['台灣端','無（本地支付）']]}}}
+];
+
+async function loadData(){
+  try{const r=await fetch(DATA_URL);if(r.ok){allData=await r.json();if(allData.length)lastUpdated=allData[allData.length-1].timestamp}}catch(e){}
+  try{const r=await fetch(LIVE_API);if(r.ok){const d=await r.json();currentRate=d.rates.TWD}}catch(e){
+    try{const r=await fetch(FALLBACK_API);if(r.ok){const d=await r.json();currentRate=d.rates.TWD}}catch(e2){}}
+  if(!currentRate&&allData.length)currentRate=allData[allData.length-1].rate;
+  if(allData.length<3){allData=genDemo(90);if(!currentRate)currentRate=allData[allData.length-1].rate}
+  render();
+}
+function genDemo(n){const d=[];let r=currentRate||22.78;const now=new Date();for(let i=n;i>=0;i--){const dt=new Date(now);dt.setDate(dt.getDate()-i);r+=(Math.random()-.48)*.12;r=Math.max(21.5,Math.min(23.5,r));d.push({date:dt.toISOString().slice(0,10),rate:+r.toFixed(4),timestamp:dt.toISOString()})}if(currentRate)d[d.length-1].rate=currentRate;return d}
+function ma(d,n){const s=d.slice(-n);return s.length?+(s.reduce((a,x)=>a+x.rate,0)/s.length).toFixed(4):null}
+function pct(d,r){return +(d.filter(x=>x.rate<r).length/d.length*100).toFixed(1)}
+function nextRBA(){const n=new Date();for(const d of RBA){const dt=new Date(d);if(dt>n)return Math.ceil((dt-n)/864e5)}return'--'}
+
+function render(){
+  if(!currentRate)return;const r=currentRate,m30=ma(allData,30),m90=ma(allData,90),p=pct(allData,r);
+  const prev=allData.length>6?allData[allData.length-7].rate:allData[0].rate,chg=r-prev;
+  const d90=allData.slice(-90),hi=Math.max(...d90.map(x=>x.rate)),lo=Math.min(...d90.map(x=>x.rate));
+  document.getElementById('hRate').textContent=r.toFixed(4);
+  const hc=document.getElementById('hChange');hc.textContent=`${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(4)} (7d)`;hc.className='header-change '+(chg>=0?'up':'down');
+  document.getElementById('hPct').textContent=p+'%';
+  document.getElementById('hMA30').textContent=m30||'--';document.getElementById('hMA90').textContent=m90||'--';
+  if(lastUpdated){const h=Math.round((Date.now()-new Date(lastUpdated).getTime())/36e5);document.getElementById('hTime').innerHTML=h>12?`<span class="stale-badge">⚠️ ${h}小時前更新</span>`:`${new Date(lastUpdated).toLocaleString('zh-TW',{timeZone:'Australia/Melbourne'})} (Melb)`}
+  document.getElementById('sHigh90').textContent=hi.toFixed(4);document.getElementById('sLow90').textContent=lo.toFixed(4);
+  const sp=document.getElementById('sPct');sp.textContent=p+'%';sp.style.color=p<40?'var(--green)':p>70?'var(--red)':'var(--orange)';
+  document.getElementById('sRBA').textContent=nextRBA()+'天';document.getElementById('pctDot').style.left=p+'%';
+  document.getElementById('rateSlider').value=r;document.getElementById('rateInput').value=r.toFixed(2);
+  renderChart(30);renderRangeChips();renderHeatmap();updateCalc();updateCompare();
+}
+
+function renderChart(days){
+  const sl=allData.slice(-days),st=Math.max(1,Math.floor(sl.length/60)),sam=sl.filter((_,i)=>i%st===0||i===sl.length-1);
+  const lb=sam.map(d=>{const t=new Date(d.date);return`${t.getMonth()+1}/${t.getDate()}`}),rt=sam.map(d=>d.rate),m30=ma(allData,30),m90=ma(allData,90);
+  if(chart)chart.destroy();const ctx=document.getElementById('rateChart').getContext('2d');
+  const g=ctx.createLinearGradient(0,0,0,200);g.addColorStop(0,'rgba(26,26,46,.12)');g.addColorStop(1,'rgba(26,26,46,0)');
+  chart=new Chart(ctx,{type:'line',data:{labels:lb,datasets:[{data:rt,borderColor:'#1a1a2e',borderWidth:2,backgroundColor:g,fill:true,pointRadius:0,tension:.3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxRotation:0,maxTicksLimit:5,font:{size:10},color:'#999'}},y:{grid:{color:'#f0f0f0'},ticks:{font:{size:10},color:'#999',callback:v=>v.toFixed(1)}}}},
+    plugins:[{id:'ma',afterDraw(c){const{ctx:x,chartArea:{left:l,right:r},scales:{y}}=c;
+      [m30&&['#64b5f6',m30],m90&&['#ffb74d',m90]].filter(Boolean).forEach(([col,val])=>{const yp=y.getPixelForValue(val);x.save();x.setLineDash([4,4]);x.strokeStyle=col;x.lineWidth=1;x.beginPath();x.moveTo(l,yp);x.lineTo(r,yp);x.stroke();x.restore()})}}]});
+}
+function renderRangeChips(){document.getElementById('rangeChips').innerHTML=[[7,'7天'],[30,'30天'],[90,'90天'],[180,'半年']].map(([d,l])=>`<button class="chip ${d===30?'active':''}" onclick="document.querySelectorAll('#rangeChips .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderChart(${d})">${l}</button>`).join('')}
+
+function renderHeatmap(){
+  const n=new Date(),y=n.getFullYear(),m=n.getMonth();document.getElementById('heatmapMonth').textContent=`${y}年${m+1}月`;
+  const fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),ms=`${y}-${String(m+1).padStart(2,'0')}`,mr={};
+  allData.filter(d=>d.date.startsWith(ms)).forEach(d=>{const day=+d.date.split('-')[2];if(!mr[day])mr[day]=[];mr[day].push(d.rate)});
+  const ar=Object.values(mr).flat(),mn=ar.length?Math.min(...ar):22,mx=ar.length?Math.max(...ar):23,rg=mx-mn||.5;
+  let h='';['日','一','二','三','四','五','六'].forEach(d=>h+=`<div class="heatmap-day-label">${d}</div>`);
+  for(let i=0;i<fd;i++)h+='<div class="heatmap-cell" style="background:transparent"></div>';
+  for(let d=1;d<=dim;d++){if(mr[d]){const avg=mr[d].reduce((a,b)=>a+b,0)/mr[d].length,p=(avg-mn)/rg;
+    h+=`<div class="heatmap-cell" style="background:rgb(${Math.round(52+p*203)},${Math.round(199-p*140)},${Math.round(89-p*30)})" title="${avg.toFixed(4)}"><span class="day-num">${d}</span></div>`}
+    else h+=`<div class="heatmap-cell" style="background:#e8e8e8"><span class="day-num" style="color:#aaa">${d}</span></div>`}
+  document.getElementById('heatmap').innerHTML=h;
+}
+
+// === DIRECTION SYNC ===
+function setDir(dir){
+  gDir=dir;const tw=dir==='tw2au';
+  // Sync both toggles
+  document.querySelectorAll('.dir-toggle').forEach(tgl=>{const btns=tgl.querySelectorAll('.dir-btn');btns[0].classList.toggle('active',tw);btns[1].classList.toggle('active',!tw)});
+  // Calc
+  document.getElementById('calcAmtLabel').textContent=tw?'匯款金額 (TWD)':'匯款金額 (AUD)';
+  document.getElementById('calcPrefix').textContent=tw?'NT$':'A$';
+  document.getElementById('calcAmt').value=tw?'200000':'5000';
+  // Compare
+  document.getElementById('cmpAmtLabel').textContent=tw?'匯款金額 (TWD)':'匯款金額 (AUD)';
+  document.getElementById('cmpPrefix').textContent=tw?'NT$':'A$';
+  document.getElementById('cmpAmt').value=tw?'200000':'5000';
+  renderCalcPresets();renderCmpPresets();updateCalc();updateCompare();
+}
+
+function renderCalcPresets(){const p=gDir==='tw2au'?[5e4,1e5,2e5,3e5]:[2e3,5e3,8e3,13e3],c=document.getElementById('calcAmt').value;
+  document.getElementById('calcPresets').innerHTML=p.map(v=>`<button class="amt-preset ${String(v)===c?'active':''}" onclick="document.getElementById('calcAmt').value='${v}';updateCalc();renderCalcPresets()">${v>=1e4?(v/1e4)+'萬':v.toLocaleString()}</button>`).join('')}
+function renderCmpPresets(){const p=gDir==='tw2au'?[5e4,1e5,2e5,3e5]:[2e3,5e3,8e3,13e3],c=document.getElementById('cmpAmt').value;
+  document.getElementById('cmpPresets').innerHTML=p.map(v=>`<button class="amt-preset ${String(v)===c?'active':''}" onclick="document.getElementById('cmpAmt').value='${v}';updateCompare();renderCmpPresets()">${v>=1e4?(v/1e4)+'萬':v.toLocaleString()}</button>`).join('')}
+
+function updateCalc(){
+  if(!currentRate)return;const amt=parseFloat(document.getElementById('calcAmt').value)||0,r=currentRate,tw=gDir==='tw2au';
+  const simR=parseFloat(document.getElementById('rateSlider').value)||r;
+  document.getElementById('rateInput').value=simR.toFixed(2);
+  // Use buy/sell rate for display
+  const bankRate=tw?r*(1+BANK_SPREAD):r*(1-CBA_SPREAD);
+  const bankSimR=tw?simR*(1+BANK_SPREAD):simR*(1-CBA_SPREAD);
+  const nowRes=tw?amt/bankRate:amt*bankRate, simRes=tw?amt/bankSimR:amt*bankSimR;
+  const unit=tw?'A$':'NT$';
+  document.getElementById('simNowR').textContent=r.toFixed(2);document.getElementById('simIfR').textContent=simR.toFixed(2);
+  document.getElementById('simNowV').textContent=unit+Math.round(nowRes).toLocaleString();
+  document.getElementById('simIfV').textContent=unit+Math.round(simRes).toLocaleString();
+  const diff=nowRes-simRes,el=document.getElementById('simDiff');
+  el.textContent=diff>0?`現在換多拿 ${unit}${Math.abs(Math.round(diff)).toLocaleString()}`:diff<0?`等到假設匯率多拿 ${unit}${Math.abs(Math.round(diff)).toLocaleString()}`:'相同';
+  el.style.background=diff>0?'#e8f5e9':diff<0?'#fbe9e7':'#f5f5f5';el.style.color=diff>0?'#2e7d32':diff<0?'#c62828':'#666';
+  // Rate note
+  document.getElementById('calcRateNote').innerHTML=tw?`使用銀行<strong>賣出匯率</strong>（中間價 ${r.toFixed(2)} + 0.4% ≈ ${bankRate.toFixed(2)}）`:`使用銀行<strong>買入匯率</strong>（中間價 ${r.toFixed(2)} - spread）`;
+  // Budget
+  const bA=1e5/r,bA1=1e5/(r+1);
+  document.getElementById('budgetImpact').innerHTML=`月生活費 TWD 10 萬 ≈ <strong>A$${Math.round(bA).toLocaleString()}</strong>。匯率漲 1 塊 → 每月多花 <strong style="color:var(--red)">A$${Math.round(bA-bA1)}</strong>`;
+  renderCalcPresets();
+}
+
+function updateCompare(){
+  if(!currentRate)return;const amt=parseFloat(document.getElementById('cmpAmt').value)||0;
+  const intm=parseFloat(document.getElementById('adjIntm').value)||116;
+  const chs=gDir==='tw2au'?CH_TW2AU:CH_AU2TW;
+  const tw=gDir==='tw2au';
+  const destLabel=tw?'實際到手 AUD':'實際到手 TWD';
+  const destBank=tw?'→ CBA':'→ 台灣銀行';
+  const results=chs.map(ch=>({...ch,result:ch.calc(amt,currentRate,intm)})).sort((a,b)=>b.result.received-a.result.received);
+  const u=results[0]?.result.unit,pf=u==='AUD'?'A$':'NT$',isAUD=u==='AUD';
+
+  // Summary table
+  let th=`<tr><th>#</th><th>管道</th><th>到手${u}</th><th>差距</th></tr>`;
+  const rows=results.map((ch,i)=>{const v=isAUD?ch.result.received.toFixed(2):Math.round(ch.result.received).toLocaleString();
+    const diff=i===0?'—':('-'+pf+(isAUD?(results[0].result.received-ch.result.received).toFixed(2):Math.round(results[0].result.received-ch.result.received).toLocaleString()));
+    return`<tr><td><span class="rank rank-${Math.min(i+1,3)}">${i+1}</span></td><td>${ch.emoji} ${ch.name}${ch.est?' <span class="est">估</span>':''}</td><td style="font-weight:600">${pf}${v}</td><td style="color:${i===0?'var(--green)':'var(--red)'">${diff}</td></tr>`}).join('');
+  document.getElementById('sumTable').innerHTML=th+rows;
+
+  // Detail cards
+  document.getElementById('compareResults').innerHTML=results.map((ch,i)=>{const r=ch.result,best=i===0;
+    return`<div class="ch-card ${best?'best':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><span style="font-size:18px;margin-right:4px">${ch.emoji}</span><span class="ch-name">${ch.name}</span>${ch.est?' <span class="est">估</span>':''}</div>
+        ${best?'<span class="ch-badge">最划算</span>':''}
+      </div>
+      <div class="ch-received-label">${destLabel} ${destBank}</div>
+      <div class="ch-received ${best?'best-val':''}">${pf}${isAUD?r.received.toFixed(2):Math.round(r.received).toLocaleString()}</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:4px">使用匯率：${r.rateUsed}</div>
+      <div class="ch-breakdown">${r.fees.map(f=>`<div class="ch-fee-row"><span>${f[0]}</span><span>${f[1]}</span></div>`).join('')}
+        <div class="ch-fee-row" style="font-size:10px;color:#bbb;margin-top:4px"><span>資料來源</span><span>${ch.src}</span></div></div>
+      ${!best?`<div class="ch-diff">少拿 ${pf}${isAUD?(results[0].result.received-r.received).toFixed(2):Math.round(results[0].result.received-r.received).toLocaleString()} ${u}</div>`:''}</div>`}).join('');
+  renderCmpPresets();
+}
+
+function switchTab(t){document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');document.querySelector(`.nav-btn[onclick="switchTab('${t}')"]`).classList.add('active');
+  if(t==='calc'){renderCalcPresets();updateCalc()}if(t==='compare'){renderCmpPresets();updateCompare()}}
+
+renderCalcPresets();loadData();
+</script>
+</body>
+</html>
