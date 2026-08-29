@@ -192,7 +192,7 @@
 <div class="footer">AUD/TWD Tracker v1.0<br>數據每 4 小時更新 · 匯率來源：ECB<br><span id="footerStale"></span></div>
 
 <script>
-const DATA_URL='https://raw.githubusercontent.com/willychen88/aud-tracker/main/data/rates.json';
+const DATA_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSXrIBl-PouD9S8RrfLD9JtUIeFxgArwgtWFCBsl_h9dHUZ5YcQc-FER2UXFnPoi_HFyRSnUh3tPSIv/pub?output=csv';
 const LIVE_API='https://api.frankfurter.dev/latest?from=AUD&to=TWD';
 const FALLBACK_API='https://open.er-api.com/v6/latest/AUD';
 const RBA=['2026-09-30','2026-11-04','2026-12-09'];
@@ -223,10 +223,31 @@ const CH_AU2TW=[
 ];
 
 async function loadData(){
-  try{const r=await fetch(DATA_URL);if(r.ok){allData=await r.json();if(allData.length)lastUpdated=allData[allData.length-1].timestamp}}catch(e){}
-  try{const r=await fetch(LIVE_API);if(r.ok){const d=await r.json();currentRate=d.rates.TWD}}catch(e){
-    try{const r=await fetch(FALLBACK_API);if(r.ok){const d=await r.json();currentRate=d.rates.TWD}}catch(e2){}}
-  if(!currentRate&&allData.length)currentRate=allData[allData.length-1].rate;
+  // 1. Load history from Google Sheet CSV
+  try{
+    const r=await fetch(DATA_URL);
+    if(r.ok){
+      const csv=await r.text();
+      const lines=csv.trim().split('\n');
+      for(let i=1;i<lines.length;i++){
+        const parts=lines[i].split(',');
+        if(parts.length>=2){
+          const ts=parts[0].trim();
+          const rate=parseFloat(parts[1]);
+          if(!isNaN(rate)&&ts){
+            allData.push({date:ts.slice(0,10),rate:rate,timestamp:ts,time:ts.slice(11,16)});
+          }
+        }
+      }
+      if(allData.length){
+        const last=allData[allData.length-1];
+        lastUpdated=last.timestamp;
+        currentRate=last.rate;
+      }
+    }
+  }catch(e){console.warn('CSV load failed:',e)}
+  // 2. Try live API for even more current rate
+  try{const r=await fetch(LIVE_API);if(r.ok){const d=await r.json();if(d.rates&&d.rates.TWD)currentRate=d.rates.TWD}}catch(e){}
   if(!currentRate)currentRate=22.78;
   if(allData.length<3)allData=genDemo(90);
   render();
