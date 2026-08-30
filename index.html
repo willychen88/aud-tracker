@@ -137,7 +137,7 @@
     <div class="card-title">匯率試算 — 拖動或輸入匯率</div>
     <div style="display:flex;align-items:center;gap:12px">
       <input type="range" id="rateSlider" min="20" max="25" step="0.01" style="flex:1;accent-color:var(--accent)" oninput="document.getElementById('rateInput').value=this.value;updateCalc()">
-      <input class="adj-input" id="rateInput" type="number" step="0.01" style="width:75px;font-size:16px" oninput="document.getElementById('rateSlider').value=this.value;updateCalc()">
+      <input class="adj-input" id="rateInput" type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" style="width:75px;font-size:16px" oninput="const v=parseFloat(this.value);if(!isNaN(v)){document.getElementById('rateSlider').value=v;updateCalc()}">
     </div>
     <div class="rate-sim-result">
       <div class="rate-sim-box"><div class="label">現在 <span id="simNowR"></span></div><div class="val" id="simNowV"></div></div>
@@ -156,8 +156,8 @@
 <div id="tab-compare" class="tab-content">
   <div style="padding:0 16px;margin-top:10px">
     <div class="dir-toggle" id="cmpDirToggle">
-      <button class="dir-btn active" onclick="setDir('tw2au')">🇹🇼 → 🇦🇺 CBA</button>
-      <button class="dir-btn" onclick="setDir('au2tw')">🇦🇺 CBA → 🇹🇼</button>
+      <button class="dir-btn active" onclick="setDir('tw2au')">🇹🇼 → 🇦🇺 澳洲銀行</button>
+      <button class="dir-btn" onclick="setDir('au2tw')">🇦🇺 澳洲銀行 → 🇹🇼</button>
     </div>
   </div>
   <div class="card">
@@ -169,10 +169,10 @@
   <div class="card">
     <div class="card-title">中轉行費用調整（SHA 適用）</div>
     <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:12px;color:var(--sub)">中轉行+CBA入帳 (AUD)</span>
+      <span style="font-size:12px;color:var(--sub)">中轉行+澳洲銀行入帳 (AUD)</span>
       <input class="adj-input" id="adjIntm" type="number" value="116" oninput="updateCompare()">
     </div>
-    <div class="info-box">實測值 <strong>AUD 116</strong>（玉山→CBA, 2026/08/27）。CBA 入帳費最高 AUD 11/筆（官方）。每次路徑不同，費用會變。</div>
+    <div class="info-box">實測值 <strong>AUD 116</strong>（玉山→CBA, 2026/08/27）。澳洲銀行入帳費最高 AUD 11/筆（CBA 官方）。每次路徑不同，費用會變。</div>
   </div>
   <div id="compareResults" style="padding:0 16px"></div>
   <div class="card">
@@ -180,7 +180,7 @@
     <div class="info-box">
       <strong>SHA（費用共擔）</strong>：匯款人付台灣端費用，中轉行和收款行的費用從匯款金額扣。到手金額不確定。<br>
       <strong>OUR（全額到款）</strong>：所有費用由匯款人支付，收款人拿到完整金額。台灣端費用較高。<br>
-      <strong>終點銀行</strong>：CBA Commonwealth Bank of Australia
+      <strong>終點銀行</strong>：澳洲銀行（如 CBA, ANZ, NAB 等）
     </div>
   </div>
   <div class="disclaimer">
@@ -193,8 +193,6 @@
 
 <script>
 const DATA_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSXrIBl-PouD9S8RrfLD9JtUIeFxgArwgtWFCBsl_h9dHUZ5YcQc-FER2UXFnPoi_HFyRSnUh3tPSIv/pub?output=csv';
-const LIVE_API='https://api.frankfurter.dev/latest?from=AUD&to=TWD';
-const FALLBACK_API='https://open.er-api.com/v6/latest/AUD';
 const RBA=['2026-09-30','2026-11-04','2026-12-09'];
 let allData=[],currentRate=null,lastUpdated=null,chart=null,gDir='tw2au';
 
@@ -203,23 +201,23 @@ const BANK_SPREAD=0.004, CBA_SPREAD=0.04;
 
 const CH_TW2AU=[
   {id:'esun_sha',name:'玉山 SHA',emoji:'🏦',src:'實測',est:false,
-    calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),a=(t-400)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費+郵電費','TWD 400'],['中轉行+CBA入帳','AUD '+i]]}}},
+    calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),a=(t-400)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',totalFee:400+i*sr,feeUnit:'TWD',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費+郵電費','TWD 400'],['中轉行+澳洲銀行入帳','AUD '+i]]}}},
   {id:'esun_our',name:'玉山 OUR',emoji:'🏦',src:'估算',est:true,
-    calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),a=(t-700)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費+郵電費(×2)','~TWD 700'],['中轉行+CBA','匯款人付']]}}},
+    calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),a=(t-1000)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',totalFee:1000,feeUnit:'TWD',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費+郵電費(×2)','~TWD 1,000'],['中轉行+澳洲銀行','匯款人付']]}}},
   {id:'tcb_sha',name:'合庫 SHA',emoji:'🏛️',src:'官方',est:true,
-    calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(800,Math.max(100,Math.round(t*.00025))),a=(t-f-300)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費','TWD 300'],['中轉行+CBA入帳','AUD '+i]]}}},
+    calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(800,Math.max(100,Math.round(t*.00025))),a=(t-f-300)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',totalFee:f+300+i*sr,feeUnit:'TWD',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費','TWD 300'],['中轉行+澳洲銀行入帳','AUD '+i]]}}},
   {id:'tcb_our',name:'合庫 OUR',emoji:'🏛️',src:'官方',est:true,
-    calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(800,Math.max(100,Math.round(t*.00025))),a=(t-f-600)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費(×2)','TWD 600'],['中轉行+CBA','匯款人付']]}}},
+    calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(800,Math.max(100,Math.round(t*.00025))),a=(t-f-600)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',totalFee:f+600,feeUnit:'TWD',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費(×2)','TWD 600'],['中轉行+澳洲銀行','匯款人付']]}}},
   {id:'wise',name:'Wise',emoji:'🌐',src:'網路',est:true,
-    calc:(t,r)=>{const f=t*.0075,a=(t-f)/r;return{received:Math.max(0,a),unit:'AUD',rateUsed:r.toFixed(4)+' (中間價)',fees:[['手續費(~0.75%)','TWD '+Math.round(f)+' (估)'],['匯率','中間匯率'],['中轉行','無']]}}}
+    calc:(t,r)=>{const f=t*.0075,a=(t-f)/r;return{received:Math.max(0,a),unit:'AUD',rateUsed:r.toFixed(4)+' (中間價)',totalFee:f,feeUnit:'TWD',fees:[['手續費(~0.75%)','TWD '+Math.round(f)+' (估)'],['匯率','中間匯率'],['中轉行','無']]}}}
 ];
 const CH_AU2TW=[
-  {id:'cba',name:'CBA App',emoji:'🏦',src:'官方',est:true,
-    calc:(a,r)=>{const br=r*(1-CBA_SPREAD),rf=Math.min(800,Math.max(200,Math.round(a*br*.0005))),t=a*br-rf;return{received:Math.max(0,t),unit:'TWD',rateUsed:br.toFixed(4)+' (CBA買入,估)',fees:[['CBA手續費','AUD 0（App免費）'],['CBA中轉行','AUD 0（CBA吸收）'],['匯率加價','~4% (估)'],['台灣端解匯','TWD '+rf]]}}},
+  {id:'cba',name:'澳洲銀行 App',emoji:'🏦',src:'官方',est:true,
+    calc:(a,r)=>{const br=r*(1-CBA_SPREAD),rf=Math.min(800,Math.max(200,Math.round(a*br*.0005))),t=a*br-rf;return{received:Math.max(0,t),unit:'TWD',rateUsed:br.toFixed(4)+' (澳洲銀行買入,估)',totalFee:a*r*CBA_SPREAD+rf,feeUnit:'TWD',feeNote:'含匯差',fees:[['手續費','AUD 0（App免費）'],['中轉行','AUD 0（銀行吸收）'],['匯率加價','~4% (估)'],['台灣端解匯','TWD '+rf]]}}},
   {id:'revolut',name:'Revolut',emoji:'💳',src:'網路',est:true,
-    calc:(a,r)=>{const rf=Math.min(800,Math.max(200,Math.round((a-40)*r*.0005))),t=(a-40)*r-rf;return{received:Math.max(0,t),unit:'TWD',rateUsed:r.toFixed(4)+' (中間價)',fees:[['轉帳費','AUD 10'],['中轉行','~AUD 30 (估)'],['匯率','中間匯率(額度內)'],['台灣端解匯','TWD '+rf]]}}},
+    calc:(a,r)=>{const rf=Math.min(800,Math.max(200,Math.round((a-40)*r*.0005))),t=(a-40)*r-rf;return{received:Math.max(0,t),unit:'TWD',rateUsed:r.toFixed(4)+' (中間價)',totalFee:40*r+rf,feeUnit:'TWD',fees:[['轉帳費','AUD 10'],['中轉行','~AUD 30 (估)'],['匯率','中間匯率(額度內)'],['台灣端解匯','TWD '+rf]]}}},
   {id:'wise2',name:'Wise',emoji:'🌐',src:'網路',est:true,
-    calc:(a,r)=>{const f=a*.0075,t=(a-f)*r;return{received:Math.max(0,t),unit:'TWD',rateUsed:r.toFixed(4)+' (中間價)',fees:[['手續費(~0.75%)','AUD '+f.toFixed(2)+' (估)'],['匯率','中間匯率'],['中轉行','無'],['台灣端','無（本地支付）']]}}}
+    calc:(a,r)=>{const f=a*.0075,t=(a-f)*r;return{received:Math.max(0,t),unit:'TWD',rateUsed:r.toFixed(4)+' (中間價)',totalFee:f*r,feeUnit:'TWD',fees:[['手續費(~0.75%)','AUD '+f.toFixed(2)+' (估)'],['匯率','中間匯率'],['中轉行','無'],['台灣端','無（本地支付）']]}}}
 ];
 
 async function loadData(){
@@ -347,15 +345,17 @@ function updateCompare(){
   const chs=gDir==='tw2au'?CH_TW2AU:CH_AU2TW;
   const tw=gDir==='tw2au';
   const destLabel=tw?'實際到手 AUD':'實際到手 TWD';
-  const destBank=tw?'→ CBA':'→ 台灣銀行';
+  const destBank=tw?'→ 澳洲銀行':'→ 台灣銀行';
   const results=chs.map(ch=>({...ch,result:ch.calc(amt,currentRate,intm)})).sort((a,b)=>b.result.received-a.result.received);
   const u=results[0]?.result.unit,pf=u==='AUD'?'A$':'NT$',isAUD=u==='AUD';
 
   // Summary table
-  let th=`<tr><th>#</th><th>管道</th><th>到手${u}</th><th>差距</th></tr>`;
+  const fPf=tw?'NT$':'NT$';
+  let th=`<tr><th>#</th><th>管道</th><th>手續費</th><th>到手${u}</th><th>差距</th></tr>`;
   const rows=results.map((ch,i)=>{const v=isAUD?ch.result.received.toFixed(2):Math.round(ch.result.received).toLocaleString();
     const diff=i===0?'—':('-'+pf+(isAUD?(results[0].result.received-ch.result.received).toFixed(2):Math.round(results[0].result.received-ch.result.received).toLocaleString()));
-    const clr=i===0?'var(--green)':'var(--red)';return`<tr><td><span class="rank rank-${Math.min(i+1,3)}">${i+1}</span></td><td>${ch.emoji} ${ch.name}${ch.est?' <span class="est">估</span>':''}</td><td style="font-weight:600">${pf}${v}</td><td style="color:${clr}">${diff}</td></tr>`}).join('');
+    const fee=ch.result.totalFee!=null?'NT$'+Math.round(ch.result.totalFee).toLocaleString()+(ch.result.feeNote?' <span class="est">'+ch.result.feeNote+'</span>':''):'—';
+    const clr=i===0?'var(--green)':'var(--red)';return`<tr><td><span class="rank rank-${Math.min(i+1,3)}">${i+1}</span></td><td>${ch.emoji} ${ch.name}${ch.est?' <span class="est">估</span>':''}</td><td style="font-size:10px">${fee}</td><td style="font-weight:600">${pf}${v}</td><td style="color:${clr}">${diff}</td></tr>`}).join('');
   document.getElementById('sumTable').innerHTML=th+rows;
 
   // Detail cards
@@ -369,6 +369,7 @@ function updateCompare(){
       <div class="ch-received ${best?'best-val':''}">${pf}${isAUD?r.received.toFixed(2):Math.round(r.received).toLocaleString()}</div>
       <div style="font-size:11px;color:var(--sub);margin-top:4px">使用匯率：${r.rateUsed}</div>
       <div class="ch-breakdown">${r.fees.map(f=>`<div class="ch-fee-row"><span>${f[0]}</span><span>${f[1]}</span></div>`).join('')}
+        <div class="ch-fee-row" style="font-weight:600;border-top:1px solid var(--border);padding-top:4px;margin-top:4px;color:var(--text)"><span>總手續費 (TWD)</span><span>NT$${Math.round(r.totalFee).toLocaleString()}${r.feeNote?' <span class="est">'+r.feeNote+'</span>':''}</span></div>
         <div class="ch-fee-row" style="font-size:10px;color:#bbb;margin-top:4px"><span>資料來源</span><span>${ch.src}</span></div></div>
       ${!best?`<div class="ch-diff">少拿 ${pf}${isAUD?(results[0].result.received-r.received).toFixed(2):Math.round(results[0].result.received-r.received).toLocaleString()} ${u}</div>`:''}</div>`}).join('');
   renderCmpPresets();
