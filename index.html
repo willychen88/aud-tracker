@@ -136,8 +136,8 @@
   <div class="card">
     <div class="card-title">匯率試算 — 拖動或輸入匯率</div>
     <div style="display:flex;align-items:center;gap:12px">
-      <input type="range" id="rateSlider" min="20" max="25" step="0.01" style="flex:1;accent-color:var(--accent)" oninput="document.getElementById('rateInput').value=this.value;updateCalc()">
-      <input class="adj-input" id="rateInput" type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" style="width:75px;font-size:16px" oninput="const v=parseFloat(this.value);if(!isNaN(v)){document.getElementById('rateSlider').value=v;updateCalc()}">
+      <input type="range" id="rateSlider" min="20" max="25" step="0.01" style="flex:1;accent-color:var(--accent)" oninput="document.getElementById('rateInput').value=parseFloat(this.value).toFixed(2);updateCalc()">
+      <input class="adj-input" id="rateInput" type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" style="width:75px;font-size:16px" oninput="updateCalc()">
     </div>
     <div class="rate-sim-result">
       <div class="rate-sim-box"><div class="label">現在 <span id="simNowR"></span></div><div class="val" id="simNowV"></div></div>
@@ -205,9 +205,9 @@ const CH_TW2AU=[
   {id:'esun_our',name:'玉山 OUR',emoji:'🏦',src:'估算',est:true,
     calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),a=(t-1000)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',totalFee:1000,feeUnit:'TWD',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費+郵電費(×2)','~TWD 1,000'],['中轉行+澳洲銀行','匯款人付']]}}},
   {id:'tcb_sha',name:'合庫 SHA',emoji:'🏛️',src:'官方',est:true,
-    calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(800,Math.max(100,Math.round(t*.00025))),a=(t-f-300)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',totalFee:f+300+i*sr,feeUnit:'TWD',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費','TWD 300'],['中轉行+澳洲銀行入帳','AUD '+i]]}}},
+    calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(600,Math.max(130,Math.round(t*.00025))),a=(t-f-220)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',totalFee:f+220+i*sr,feeUnit:'TWD',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費','TWD 220'],['中轉行+澳洲銀行入帳','AUD '+i]]}}},
   {id:'tcb_our',name:'合庫 OUR',emoji:'🏛️',src:'官方',est:true,
-    calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(800,Math.max(100,Math.round(t*.00025))),a=(t-f-600)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',totalFee:f+600,feeUnit:'TWD',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費(×2)','TWD 600'],['中轉行+澳洲銀行','匯款人付']]}}},
+    calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(600,Math.max(130,Math.round(t*.00025))),a=(t-f-220)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+' (賣出)',totalFee:f+220,feeUnit:'TWD',fees:[['銀行賣出匯率','中間價+0.4%'],['手續費(0.025%)','TWD '+f],['郵電費','TWD 220'],['中轉行+澳洲銀行','匯款人付(另計)']]}}},
   {id:'wise',name:'Wise',emoji:'🌐',src:'網路',est:true,
     calc:(t,r)=>{const f=t*.0075,a=(t-f)/r;return{received:Math.max(0,a),unit:'AUD',rateUsed:r.toFixed(4)+' (中間價)',totalFee:f,feeUnit:'TWD',fees:[['手續費(~0.75%)','TWD '+Math.round(f)+' (估)'],['匯率','中間匯率'],['中轉行','無']]}}}
 ];
@@ -318,8 +318,9 @@ function renderCmpPresets(){const p=gDir==='tw2au'?[5e4,1e5,2e5,3e5]:[2e3,5e3,8e
 
 function updateCalc(){
   if(!currentRate)return;const amt=parseFloat(document.getElementById('calcAmt').value)||0,r=currentRate,tw=gDir==='tw2au';
-  const simR=parseFloat(document.getElementById('rateSlider').value)||r;
-  document.getElementById('rateInput').value=simR.toFixed(2);
+  const simR=parseFloat(document.getElementById('rateInput').value)||r;
+  // Sync slider visually (clamped is fine, we don't read back from it)
+  document.getElementById('rateSlider').value=simR;
   // Use buy/sell rate for display
   const bankRate=tw?r*(1+BANK_SPREAD):r*(1-CBA_SPREAD);
   const bankSimR=tw?simR*(1+BANK_SPREAD):simR*(1-CBA_SPREAD);
