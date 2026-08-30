@@ -207,7 +207,7 @@ const LANG = {
     percentile_short:'百分位', percentile:'百分位',
     high_90d:'90天最高', low_90d:'90天最低', hist_pct:'歷史百分位', rba_next:'RBA 下次會議',
     cheap:'便宜', mid:'中間', expensive:'偏貴', low:'低', high:'高',
-    ma_info:'MA30/MA90 = 過去 30/90 天均價。現在 < MA → 偏便宜。',
+    ma_info:'MA30/MA90 = 過去 30/90 天均價。現在 &lt; MA → 偏便宜。',
     heatmap_title:'月曆熱力圖',
     days_short:['日','一','二','三','四','五','六'],
     range_chips:[[7,'7天'],[30,'30天'],[90,'90天'],[180,'半年']],
@@ -264,7 +264,7 @@ const LANG = {
     percentile_short:'Pctile', percentile:'Percentile',
     high_90d:'90D High', low_90d:'90D Low', hist_pct:'Hist. Percentile', rba_next:'Next RBA Meeting',
     cheap:'Cheap', mid:'Mid', expensive:'Expensive', low:'Low', high:'High',
-    ma_info:'MA30/MA90 = 30/90-day average. Current < MA → relatively cheap.',
+    ma_info:'MA30/MA90 = 30/90-day average. Current &lt; MA → relatively cheap.',
     heatmap_title:'Monthly Heatmap',
     days_short:['Su','Mo','Tu','We','Th','Fr','Sa'],
     range_chips:[[7,'7D'],[30,'30D'],[90,'90D'],[180,'6M']],
@@ -321,9 +321,11 @@ function T(k){return LANG[curLang][k]||LANG.zh[k]||k}
 function toggleLang(){
   curLang=curLang==='zh'?'en':'zh';
   document.querySelector('.lang-btn').textContent=curLang==='zh'?'🌐 EN':'🌐 中文';
-  document.querySelectorAll('[data-i18n]').forEach(el=>{
-    const v=T(el.dataset.i18n);
-    if(v)el.innerHTML=v;
+  // Update all data-i18n elements using getAttribute (more reliable than dataset)
+  document.querySelectorAll('[data-i18n]').forEach(function(el){
+    var key=el.getAttribute('data-i18n');
+    var val=LANG[curLang][key];
+    if(typeof val==='string'){el.innerHTML=val}
   });
   // Re-render dynamic content
   renderRangeChips();renderHeatmap();renderTiming();renderCalcPresets();renderCmpPresets();
@@ -344,13 +346,13 @@ const BANK_SPREAD=0.004, CBA_SPREAD=0.04;
 function buildChannels(){
   return {
     tw2au:[
-      {id:'esun_sha',name:'玉山 SHA',emoji:'🏦',src:curLang==='zh'?'實測':'Tested',est:false,
+      {id:'esun_sha',name:curLang==='zh'?'玉山 SHA':'E.SUN SHA',emoji:'🏦',src:curLang==='zh'?'實測':'Tested',est:false,
         calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),a=(t-400)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:400+i*sr,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_cable'),'TWD 400'],[T('f_intm_au'),'AUD '+i]]}}},
-      {id:'esun_our',name:'玉山 OUR',emoji:'🏦',src:curLang==='zh'?'估算':'Estimated',est:true,
+      {id:'esun_our',name:curLang==='zh'?'玉山 OUR':'E.SUN OUR',emoji:'🏦',src:curLang==='zh'?'估算':'Estimated',est:true,
         calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),a=(t-1000)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:1000,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_cable_x2'),'~TWD 1,000'],[T('f_intm_au_pay'),T('sender_pays')]]}}},
-      {id:'tcb_sha',name:'合庫 SHA',emoji:'🏛️',src:curLang==='zh'?'官方':'Official',est:true,
+      {id:'tcb_sha',name:curLang==='zh'?'合庫 SHA':'TCB SHA',emoji:'🏛️',src:curLang==='zh'?'官方':'Official',est:true,
         calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(600,Math.max(130,Math.round(t*.00025))),a=(t-f-220)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:f+220+i*sr,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_pct'),'TWD '+f],[T('f_cable'),'TWD 220'],[T('f_intm_au'),'AUD '+i]]}}},
-      {id:'tcb_our',name:'合庫 OUR',emoji:'🏛️',src:curLang==='zh'?'官方':'Official',est:true,
+      {id:'tcb_our',name:curLang==='zh'?'合庫 OUR':'TCB OUR',emoji:'🏛️',src:curLang==='zh'?'官方':'Official',est:true,
         calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(600,Math.max(130,Math.round(t*.00025))),a=(t-f-220)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:f+220,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_pct'),'TWD '+f],[T('f_cable'),'TWD 220'],[T('f_intm_au_pay'),T('sender_pays_extra')]]}}},
       {id:'wise',name:'Wise',emoji:'🌐',src:curLang==='zh'?'網路':'Web',est:true,
         calc:(t,r)=>{const f=t*.0075,a=(t-f)/r;return{received:Math.max(0,a),unit:'AUD',rateUsed:r.toFixed(4)+` (${T('mid_rate')})`,totalFee:f,feeUnit:'TWD',fees:[[T('f_fee_wise'),'TWD '+Math.round(f)+` (${T('est_label')})`],[T('f_rate_mid'),T('f_rate_mid_val')],[T('f_no_intm'),T('f_no_intm_val')]]}}}
