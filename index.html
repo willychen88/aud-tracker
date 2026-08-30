@@ -72,6 +72,13 @@
   .rate-sim-box .label{font-size:11px;color:var(--sub);margin-bottom:4px}
   .rate-sim-box .val{font-size:20px;font-weight:700}
   .est{font-size:9px;color:var(--orange);font-weight:500}
+  .timing-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px}
+  .timing-label{width:28px;text-align:center;font-weight:600;font-size:11px;color:var(--sub);flex-shrink:0}
+  .timing-bar-bg{flex:1;height:20px;background:#f0f0f0;border-radius:4px;position:relative;overflow:hidden}
+  .timing-bar{height:100%;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:10px;font-weight:600;color:#fff;transition:width .5s}
+  .timing-best{background:#e8f5e9;border-radius:6px;padding:6px 10px;margin-top:8px;font-size:12px;color:#2e7d32;font-weight:500}
+  .timing-section{margin-bottom:14px}
+  .timing-section-title{font-size:11px;color:var(--sub);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
   .lang-btn{background:none;border:1.5px solid var(--accent);color:var(--accent);font-size:12px;padding:4px 12px;border-radius:16px;cursor:pointer;font-weight:600;white-space:nowrap;flex-shrink:0}
   .lang-btn:active{background:var(--accent);color:#fff}
 </style>
@@ -120,6 +127,10 @@
     <div id="heatmapMonth" style="text-align:center;font-weight:600;margin-bottom:8px"></div>
     <div class="heatmap-grid" id="heatmap"></div>
     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--sub);margin-top:8px"><span>🟢 <span data-i18n="low">低</span></span><span>🔴 <span data-i18n="high">高</span></span></div>
+  </div>
+  <div class="card">
+    <div class="card-title" data-i18n="timing_title">🕐 最佳匯款時機</div>
+    <div id="timingAnalysis"></div>
   </div>
 </div>
 
@@ -238,6 +249,14 @@ const LANG = {
     f_app_fee:'手續費', f_app_fee_val:'AUD 0（App免費）', f_intm_absorb:'中轉行', f_intm_absorb_val:'AUD 0（銀行吸收）',
     f_spread:'匯率加價', f_spread_val:'~4% (估)', f_tw_settle:'台灣端解匯',
     f_xfer_fee:'轉帳費', f_xfer_intm:'中轉行', f_rate_quota:'中間匯率(額度內)', f_tw_end:'台灣端', f_tw_end_val:'無（本地支付）',
+    // Timing analysis
+    timing_title:'🕐 最佳匯款時機',
+    timing_dow:'星期幾最便宜？', timing_hour:'幾點最便宜？',
+    timing_days_full:['週日','週一','週二','週三','週四','週五','週六'],
+    timing_best_day:(d,v)=>`📌 <strong>${d}</strong> 平均最低（${v}），適合安排匯款`,
+    timing_best_hour:(h,v)=>`📌 <strong>${h}:00</strong> 前後平均最低（${v}），建議此時段換匯`,
+    timing_note:'基於過去資料統計，不代表未來走勢。樣本數越多越可靠。',
+    timing_samples:(n)=>`共 ${n} 筆資料`,
   },
   en: {
     header_title:'AUD / TWD Exchange Tracker', lang_btn:'中',
@@ -286,6 +305,13 @@ const LANG = {
     f_app_fee:'Fee', f_app_fee_val:'AUD 0 (App free)', f_intm_absorb:'Intermediary', f_intm_absorb_val:'AUD 0 (absorbed)',
     f_spread:'Rate markup', f_spread_val:'~4% (est)', f_tw_settle:'TW settlement',
     f_xfer_fee:'Transfer fee', f_xfer_intm:'Intermediary', f_rate_quota:'Mid-market (within quota)', f_tw_end:'TW side', f_tw_end_val:'None (local payout)',
+    timing_title:'🕐 Best Time to Send',
+    timing_dow:'Cheapest day of the week?', timing_hour:'Cheapest hour?',
+    timing_days_full:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+    timing_best_day:(d,v)=>`📌 <strong>${d}</strong> has the lowest average (${v}) — best day to transfer`,
+    timing_best_hour:(h,v)=>`📌 Around <strong>${h}:00</strong> has the lowest average (${v}) — best window to exchange`,
+    timing_note:'Based on historical data — not a prediction. More samples = more reliable.',
+    timing_samples:(n)=>`${n} data points`,
   }
 };
 
@@ -300,7 +326,7 @@ function toggleLang(){
     if(v)el.innerHTML=v;
   });
   // Re-render dynamic content
-  renderRangeChips();renderHeatmap();renderCalcPresets();renderCmpPresets();
+  renderRangeChips();renderHeatmap();renderTiming();renderCalcPresets();renderCmpPresets();
   document.getElementById('cmpDir1').textContent=T('cmp_dir1');
   document.getElementById('cmpDir2').textContent=T('cmp_dir2');
   document.getElementById('disclaimer').innerHTML=T('disclaimer');
@@ -391,7 +417,7 @@ function render(){
   document.getElementById('cmpDir2').textContent=T('cmp_dir2');
   document.getElementById('disclaimer').innerHTML=T('disclaimer');
   document.getElementById('footerMain').innerHTML=T('footer');
-  renderChart(30);renderRangeChips();renderHeatmap();setDir(gDir);
+  renderChart(30);renderRangeChips();renderHeatmap();renderTiming();setDir(gDir);
 }
 
 function renderChart(days){
@@ -489,6 +515,62 @@ function updateCompare(){
         <div class="ch-fee-row" style="font-size:10px;color:#bbb;margin-top:4px"><span>${T('data_src')}</span><span>${ch.src}</span></div></div>
       ${!best?`<div class="ch-diff">${T('less_by')} ${pf}${isAUD?(results[0].result.received-r.received).toFixed(2):Math.round(results[0].result.received-r.received).toLocaleString()} ${u}</div>`:''}</div>`}).join('');
   renderCmpPresets();
+}
+
+function renderTiming(){
+  if(allData.length<10)return;
+  const el=document.getElementById('timingAnalysis');
+  // Day of week analysis
+  const dowBuckets=Array.from({length:7},()=>[]);
+  allData.forEach(d=>{const day=new Date(d.timestamp||d.date).getDay();dowBuckets[day].push(d.rate)});
+  const dowAvg=dowBuckets.map((b,i)=>({day:i,avg:b.length?b.reduce((a,x)=>a+x,0)/b.length:null,n:b.length})).filter(x=>x.avg!==null);
+  // Hour of day analysis (only if we have time data)
+  const hourBuckets=Array.from({length:24},()=>[]);
+  let hasHours=false;
+  allData.forEach(d=>{if(d.time){const h=parseInt(d.time.split(':')[0]);if(!isNaN(h)){hourBuckets[h].push(d.rate);hasHours=true}}});
+  const hourAvg=hourBuckets.map((b,i)=>({hour:i,avg:b.length>=2?b.reduce((a,x)=>a+x,0)/b.length:null,n:b.length})).filter(x=>x.avg!==null);
+
+  let html='';
+  // DOW section
+  if(dowAvg.length>=2){
+    const dowMin=Math.min(...dowAvg.map(x=>x.avg)),dowMax=Math.max(...dowAvg.map(x=>x.avg)),dowRange=dowMax-dowMin||0.01;
+    const bestDow=dowAvg.reduce((a,b)=>a.avg<b.avg?a:b);
+    const dayNames=T('timing_days_full');
+    html+=`<div class="timing-section"><div class="timing-section-title">${T('timing_dow')}</div>`;
+    // Only show weekdays with data (skip weekends if no data)
+    dowAvg.forEach(d=>{
+      const pct=((d.avg-dowMin)/dowRange)*100;
+      const isBest=d.day===bestDow.day;
+      const color=isBest?'var(--green)':pct>70?'var(--red)':'var(--orange)';
+      html+=`<div class="timing-row">
+        <span class="timing-label">${dayNames[d.day]}</span>
+        <div class="timing-bar-bg"><div class="timing-bar" style="width:${Math.max(15,20+pct*.8)}%;background:${color}">${d.avg.toFixed(3)}</div></div>
+        <span style="font-size:10px;color:#aaa;width:20px">${d.n}</span>
+      </div>`;
+    });
+    html+=`<div class="timing-best">${T('timing_best_day')(dayNames[bestDow.day],bestDow.avg.toFixed(4))}</div></div>`;
+  }
+
+  // Hour section
+  if(hasHours&&hourAvg.length>=4){
+    const hourMin=Math.min(...hourAvg.map(x=>x.avg)),hourMax=Math.max(...hourAvg.map(x=>x.avg)),hourRange=hourMax-hourMin||0.01;
+    const bestHour=hourAvg.reduce((a,b)=>a.avg<b.avg?a:b);
+    html+=`<div class="timing-section"><div class="timing-section-title">${T('timing_hour')}</div>`;
+    hourAvg.forEach(h=>{
+      const pct=((h.avg-hourMin)/hourRange)*100;
+      const isBest=h.hour===bestHour.hour;
+      const color=isBest?'var(--green)':pct>70?'var(--red)':'var(--orange)';
+      html+=`<div class="timing-row">
+        <span class="timing-label">${String(h.hour).padStart(2,'0')}</span>
+        <div class="timing-bar-bg"><div class="timing-bar" style="width:${Math.max(15,20+pct*.8)}%;background:${color}">${h.avg.toFixed(3)}</div></div>
+        <span style="font-size:10px;color:#aaa;width:20px">${h.n}</span>
+      </div>`;
+    });
+    html+=`<div class="timing-best">${T('timing_best_hour')(bestHour.hour,bestHour.avg.toFixed(4))}</div></div>`;
+  }
+
+  html+=`<div class="info-box" style="margin-top:8px">${T('timing_note')}<br><span style="color:#aaa">${T('timing_samples')(allData.length)}</span></div>`;
+  el.innerHTML=html;
 }
 
 function switchTab(t){document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
