@@ -468,10 +468,11 @@ function render(){
   const hc=document.getElementById('hChange');hc.textContent=`${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(4)} (7d)`;hc.className='header-change '+(chg>=0?'up':'down');
   document.getElementById('hPct').textContent=p+'%';
   document.getElementById('hMA30').textContent=m30||'--';document.getElementById('hMA90').textContent=m90||'--';
-  if(lastUpdated){const h=Math.round((Date.now()-new Date(lastUpdated).getTime())/36e5);document.getElementById('hTime').innerHTML=h>12?`<span class="stale-badge">${T('stale_badge')(h)}</span>`:`${new Date(lastUpdated).toLocaleString(curLang==='zh'?'zh-TW':'en-AU',{timeZone:'Australia/Melbourne'})} (Melb)`}
+  if(lastUpdated){var h=Math.round((Date.now()-new Date(lastUpdated).getTime())/36e5);var staleText=curLang==='zh'?'⚠️ '+h+'小時前更新':'⚠️ Updated '+h+'h ago';document.getElementById('hTime').innerHTML=h>12?'<span class="stale-badge">'+staleText+'</span>':new Date(lastUpdated).toLocaleString(curLang==='zh'?'zh-TW':'en-AU',{timeZone:'Australia/Melbourne'})+' (Melb)'}
   document.getElementById('sHigh90').textContent=hi.toFixed(4);document.getElementById('sLow90').textContent=lo.toFixed(4);
   const sp=document.getElementById('sPct');sp.textContent=p+'%';sp.style.color=p<40?'var(--green)':p>70?'var(--red)':'var(--orange)';
-  document.getElementById('sRBA').textContent=T('rba_days')(nextRBA());document.getElementById('pctDot').style.left=p+'%';
+  var rbaText=curLang==='zh'?nextRBA()+'天':nextRBA()+'d';
+  document.getElementById('sRBA').textContent=rbaText;document.getElementById('pctDot').style.left=p+'%';
   // Set slider range based on currency
   var slider=document.getElementById('rateSlider');
   if(gCurrency==='usd'){slider.min='28';slider.max='36'}else{slider.min='20';slider.max='25'}
@@ -494,14 +495,15 @@ function renderChart(days){
     plugins:[{id:'ma',afterDraw(c){const{ctx:x,chartArea:{left:l,right:r},scales:{y}}=c;
       [m30v&&['#64b5f6',m30v],m90v&&['#ffb74d',m90v]].filter(Boolean).forEach(([col,val])=>{const yp=y.getPixelForValue(val);x.save();x.setLineDash([4,4]);x.strokeStyle=col;x.lineWidth=1;x.beginPath();x.moveTo(l,yp);x.lineTo(r,yp);x.stroke();x.restore()})}}]});
 }
-function renderRangeChips(){const chips=T('range_chips');document.getElementById('rangeChips').innerHTML=chips.map(([d,l])=>`<button class="chip ${d===30?'active':''}" onclick="document.querySelectorAll('#rangeChips .chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderChart(${d})">${l}</button>`).join('')}
+function renderRangeChips(){var chips=curLang==='zh'?[[7,'7天'],[30,'30天'],[90,'90天'],[180,'半年']]:[[7,'7D'],[30,'30D'],[90,'90D'],[180,'6M']];document.getElementById('rangeChips').innerHTML=chips.map(function(c){return '<button class="chip '+(c[0]===30?'active':'')+'" onclick="document.querySelectorAll(\'#rangeChips .chip\').forEach(c=>c.classList.remove(\'active\'));this.classList.add(\'active\');renderChart('+c[0]+')">'+c[1]+'</button>'}).join('')}
 
 function renderHeatmap(){
-  const n=new Date(),y=n.getFullYear(),m=n.getMonth();document.getElementById('heatmapMonth').textContent=T('heatmap_month')(y,m+1);
+  const n=new Date(),y=n.getFullYear(),m=n.getMonth();document.getElementById('heatmapMonth').textContent=curLang==='zh'?y+'年'+(m+1)+'月':y+' / '+(m+1);
   const fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),ms=`${y}-${String(m+1).padStart(2,'0')}`,mr={};
   allData.filter(d=>d.date.startsWith(ms)).forEach(d=>{const day=+d.date.split('-')[2];if(!mr[day])mr[day]=[];mr[day].push(d.rate)});
   const ar=Object.values(mr).flat(),mn=ar.length?Math.min(...ar):22,mx=ar.length?Math.max(...ar):23,rg=mx-mn||.5;
-  let h='';T('days_short').forEach(d=>h+=`<div class="heatmap-day-label">${d}</div>`);
+  let h='';var dayLabels=curLang==='zh'?['日','一','二','三','四','五','六']:['Su','Mo','Tu','We','Th','Fr','Sa'];
+  dayLabels.forEach(d=>h+=`<div class="heatmap-day-label">${d}</div>`);
   for(let i=0;i<fd;i++)h+='<div class="heatmap-cell" style="background:transparent"></div>';
   for(let d=1;d<=dim;d++){if(mr[d]){const avg=mr[d].reduce((a,b)=>a+b,0)/mr[d].length,p=(avg-mn)/rg;
     h+=`<div class="heatmap-cell" style="background:rgb(${Math.round(52+p*203)},${Math.round(199-p*140)},${Math.round(89-p*30)})" title="${avg.toFixed(4)}"><span class="day-num">${d}</span></div>`}
@@ -511,48 +513,65 @@ function renderHeatmap(){
 
 // === DIRECTION SYNC ===
 function setDir(dir){
-  gDir=dir;const tw=dir==='tw2au';const isUSD=gCurrency==='usd';
-  document.querySelectorAll('.dir-toggle').forEach(tgl=>{const btns=tgl.querySelectorAll('.dir-btn');btns[0].classList.toggle('active',tw);btns[1].classList.toggle('active',!tw)});
-  const foreignLabel=isUSD?'USD':'AUD';const foreignPf=isUSD?'US$':'A$';
-  document.getElementById('calcAmtLabel').textContent=tw?T('send_amt_twd'):T(isUSD?'send_amt_usd':'send_amt_aud');
+  gDir=dir;var tw=dir==='tw2au';var isUSD=gCurrency==='usd';
+  document.querySelectorAll('.dir-toggle').forEach(function(tgl){var btns=tgl.querySelectorAll('.dir-btn');btns[0].classList.toggle('active',tw);btns[1].classList.toggle('active',!tw)});
+  var foreignPf=isUSD?'US$':'A$';
+  var amtLabelTW=curLang==='zh'?'匯款金額 (TWD)':'Send Amount (TWD)';
+  var amtLabelAUD=curLang==='zh'?'匯款金額 (AUD)':'Send Amount (AUD)';
+  var amtLabelUSD=curLang==='zh'?'匯款金額 (USD)':'Send Amount (USD)';
+  document.getElementById('calcAmtLabel').textContent=tw?amtLabelTW:(isUSD?amtLabelUSD:amtLabelAUD);
   document.getElementById('calcPrefix').textContent=tw?'NT$':foreignPf;
   document.getElementById('calcAmt').value=tw?'200000':(isUSD?'3000':'5000');
   if(!isUSD){
-    document.getElementById('cmpAmtLabel').textContent=tw?T('send_amt_twd'):T('send_amt_aud');
+    document.getElementById('cmpAmtLabel').textContent=tw?amtLabelTW:amtLabelAUD;
     document.getElementById('cmpPrefix').textContent=tw?'NT$':'A$';
     document.getElementById('cmpAmt').value=tw?'200000':'5000';
   }
   renderCalcPresets();if(!isUSD)renderCmpPresets();updateCalc();if(!isUSD)updateCompare();
 }
 
-function renderCalcPresets(){const p=gDir==='tw2au'?[5e4,1e5,2e5,3e5]:[2e3,5e3,8e3,13e3],c=document.getElementById('calcAmt').value;
-  document.getElementById('calcPresets').innerHTML=p.map(v=>`<button class="amt-preset ${String(v)===c?'active':''}" onclick="document.getElementById('calcAmt').value='${v}';updateCalc();renderCalcPresets()">${T('preset_label')(v)}</button>`).join('')}
-function renderCmpPresets(){const p=gDir==='tw2au'?[5e4,1e5,2e5,3e5]:[2e3,5e3,8e3,13e3],c=document.getElementById('cmpAmt').value;
-  document.getElementById('cmpPresets').innerHTML=p.map(v=>`<button class="amt-preset ${String(v)===c?'active':''}" onclick="document.getElementById('cmpAmt').value='${v}';updateCompare();renderCmpPresets()">${T('preset_label')(v)}</button>`).join('')}
+function renderCalcPresets(){var p=gDir==='tw2au'?[5e4,1e5,2e5,3e5]:[2e3,5e3,8e3,13e3],c=document.getElementById('calcAmt').value;
+  document.getElementById('calcPresets').innerHTML=p.map(function(v){var label=curLang==='zh'?(v>=1e4?(v/1e4)+'萬':v.toLocaleString()):(v>=1e4?Math.round(v/1e3)+'K':v.toLocaleString());return '<button class="amt-preset '+(String(v)===c?'active':'')+'" onclick="document.getElementById(\'calcAmt\').value=\''+v+'\';updateCalc();renderCalcPresets()">'+label+'</button>'}).join('')}
+function renderCmpPresets(){var p=gDir==='tw2au'?[5e4,1e5,2e5,3e5]:[2e3,5e3,8e3,13e3],c=document.getElementById('cmpAmt').value;
+  document.getElementById('cmpPresets').innerHTML=p.map(function(v){var label=curLang==='zh'?(v>=1e4?(v/1e4)+'萬':v.toLocaleString()):(v>=1e4?Math.round(v/1e3)+'K':v.toLocaleString());return '<button class="amt-preset '+(String(v)===c?'active':'')+'" onclick="document.getElementById(\'cmpAmt\').value=\''+v+'\';updateCompare();renderCmpPresets()">'+label+'</button>'}).join('')}
 
 function updateCalc(){
-  if(!currentRate)return;const amt=parseFloat(document.getElementById('calcAmt').value)||0,r=currentRate,tw=gDir==='tw2au';
-  const isUSD=gCurrency==='usd';
-  const simR=parseFloat(document.getElementById('rateInput').value)||r;
+  if(!currentRate)return;var amt=parseFloat(document.getElementById('calcAmt').value)||0,r=currentRate,tw=gDir==='tw2au';
+  var isUSD=gCurrency==='usd';
+  var simR=parseFloat(document.getElementById('rateInput').value)||r;
   document.getElementById('rateSlider').value=simR;
-  // USD uses mid-rate (no bank spread), AUD uses bank spread
-  const bankRate=isUSD?r:(tw?r*(1+BANK_SPREAD):r*(1-CBA_SPREAD));
-  const bankSimR=isUSD?simR:(tw?simR*(1+BANK_SPREAD):simR*(1-CBA_SPREAD));
-  const nowRes=tw?amt/bankRate:amt*bankRate, simRes=tw?amt/bankSimR:amt*bankSimR;
-  const unit=tw?(isUSD?'US$':'A$'):'NT$';
+  var bankRate=isUSD?r:(tw?r*(1+BANK_SPREAD):r*(1-CBA_SPREAD));
+  var bankSimR=isUSD?simR:(tw?simR*(1+BANK_SPREAD):simR*(1-CBA_SPREAD));
+  var nowRes=tw?amt/bankRate:amt*bankRate, simRes=tw?amt/bankSimR:amt*bankSimR;
+  var unit=tw?(isUSD?'US$':'A$'):'NT$';
   document.getElementById('simNowR').textContent=r.toFixed(2);document.getElementById('simIfR').textContent=simR.toFixed(2);
   document.getElementById('simNowV').textContent=unit+Math.round(nowRes).toLocaleString();
   document.getElementById('simIfV').textContent=unit+Math.round(simRes).toLocaleString();
-  const diff=nowRes-simRes,el=document.getElementById('simDiff');
-  el.textContent=diff>0?T('sim_gain_now')(unit,Math.abs(Math.round(diff)).toLocaleString()):diff<0?T('sim_gain_wait')(unit,Math.abs(Math.round(diff)).toLocaleString()):T('sim_same');
-  el.style.background=diff>0?'#e8f5e9':diff<0?'#fbe9e7':'#f5f5f5';el.style.color=diff>0?'#2e7d32':diff<0?'#c62828':'#666';
+  var diff=nowRes-simRes,el=document.getElementById('simDiff');
+  var absDiff=Math.abs(Math.round(diff)).toLocaleString();
+  if(diff>0){
+    el.textContent=curLang==='zh'?'現在換多拿 '+unit+absDiff:'Better now by '+unit+absDiff;
+    el.style.background='#e8f5e9';el.style.color='#2e7d32';
+  }else if(diff<0){
+    el.textContent=curLang==='zh'?'等到假設匯率多拿 '+unit+absDiff:'Better at target by '+unit+absDiff;
+    el.style.background='#fbe9e7';el.style.color='#c62828';
+  }else{
+    el.textContent=curLang==='zh'?'相同':'Same';
+    el.style.background='#f5f5f5';el.style.color='#666';
+  }
+  // Rate note - direct language check
   if(isUSD){
     document.getElementById('calcRateNote').innerHTML=curLang==='zh'?'使用<strong>中間匯率</strong>（銀行實際匯率會有價差）':'Using <strong>mid-market rate</strong> (bank rates may differ)';
+  }else if(tw){
+    document.getElementById('calcRateNote').innerHTML=curLang==='zh'?'使用銀行<strong>賣出匯率</strong>（中間價 '+r.toFixed(2)+' + 0.4% ≈ '+bankRate.toFixed(2)+'）':'Using bank <strong>sell rate</strong> (mid '+r.toFixed(2)+' + 0.4% ≈ '+bankRate.toFixed(2)+')';
   }else{
-    document.getElementById('calcRateNote').innerHTML=tw?T('sell_rate_note')(r.toFixed(2),bankRate.toFixed(2)):T('buy_rate_note')(r.toFixed(2));
+    document.getElementById('calcRateNote').innerHTML=curLang==='zh'?'使用銀行<strong>買入匯率</strong>（中間價 '+r.toFixed(2)+' - spread）':'Using bank <strong>buy rate</strong> (mid '+r.toFixed(2)+' - spread)';
   }
-  const bA=1e5/r,bA1=1e5/(r+1);
-  document.getElementById('budgetImpact').innerHTML=T('budget_text')(Math.round(bA).toLocaleString(),Math.round(bA-bA1));
+  // Budget - direct language check
+  var bA=1e5/r,bA1=1e5/(r+1),bAStr=Math.round(bA).toLocaleString(),diffStr=Math.round(bA-bA1);
+  document.getElementById('budgetImpact').innerHTML=curLang==='zh'
+    ?'月生活費 TWD 10 萬 ≈ <strong>A$'+bAStr+'</strong>。匯率漲 1 塊 → 每月多花 <strong style="color:var(--red)">A$'+diffStr+'</strong>'
+    :'Monthly spend TWD 100K ≈ <strong>A$'+bAStr+'</strong>. Rate +1 → extra <strong style="color:var(--red)">A$'+diffStr+'</strong>/mo';
   renderCalcPresets();
 }
 
@@ -608,8 +627,8 @@ function renderTiming(){
   if(dowAvg.length>=2){
     const dowMin=Math.min(...dowAvg.map(x=>x.avg)),dowMax=Math.max(...dowAvg.map(x=>x.avg)),dowRange=dowMax-dowMin||0.01;
     const bestDow=dowAvg.reduce((a,b)=>a.avg<b.avg?a:b);
-    const dayNames=T('timing_days_full');
-    html+=`<div class="timing-section"><div class="timing-section-title">${T('timing_dow')}</div>`;
+    var dayNames=curLang==='zh'?['週日','週一','週二','週三','週四','週五','週六']:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    html+='<div class="timing-section"><div class="timing-section-title">'+(curLang==='zh'?'星期幾最便宜？':'Cheapest day of the week?')+'</div>';
     // Only show weekdays with data (skip weekends if no data)
     dowAvg.forEach(d=>{
       const pct=((d.avg-dowMin)/dowRange)*100;
@@ -621,14 +640,15 @@ function renderTiming(){
         <span style="font-size:10px;color:#aaa;width:20px">${d.n}</span>
       </div>`;
     });
-    html+=`<div class="timing-best">${T('timing_best_day')(dayNames[bestDow.day],bestDow.avg.toFixed(4))}</div></div>`;
+    var bestDayText=curLang==='zh'?'📌 <strong>'+dayNames[bestDow.day]+'</strong> 平均最低（'+bestDow.avg.toFixed(4)+'），適合安排匯款':'📌 <strong>'+dayNames[bestDow.day]+'</strong> has the lowest average ('+bestDow.avg.toFixed(4)+') — best day to transfer';
+    html+='<div class="timing-best">'+bestDayText+'</div></div>';
   }
 
   // Hour section
   if(hasHours&&hourAvg.length>=4){
     const hourMin=Math.min(...hourAvg.map(x=>x.avg)),hourMax=Math.max(...hourAvg.map(x=>x.avg)),hourRange=hourMax-hourMin||0.01;
     const bestHour=hourAvg.reduce((a,b)=>a.avg<b.avg?a:b);
-    html+=`<div class="timing-section"><div class="timing-section-title">${T('timing_hour')}</div>`;
+    html+='<div class="timing-section"><div class="timing-section-title">'+(curLang==='zh'?'幾點最便宜？':'Cheapest hour?')+'</div>';
     hourAvg.forEach(h=>{
       const pct=((h.avg-hourMin)/hourRange)*100;
       const isBest=h.hour===bestHour.hour;
@@ -639,10 +659,13 @@ function renderTiming(){
         <span style="font-size:10px;color:#aaa;width:20px">${h.n}</span>
       </div>`;
     });
-    html+=`<div class="timing-best">${T('timing_best_hour')(bestHour.hour,bestHour.avg.toFixed(4))}</div></div>`;
+    var bestHourText=curLang==='zh'?'📌 <strong>'+bestHour.hour+':00</strong> 前後平均最低（'+bestHour.avg.toFixed(4)+'），建議此時段換匯':'📌 Around <strong>'+bestHour.hour+':00</strong> has the lowest average ('+bestHour.avg.toFixed(4)+') — best window to exchange';
+    html+='<div class="timing-best">'+bestHourText+'</div></div>';
   }
 
-  html+=`<div class="info-box" style="margin-top:8px">${T('timing_note')}<br><span style="color:#aaa">${T('timing_samples')(allData.length)}</span></div>`;
+  var timingNote=curLang==='zh'?'基於過去資料統計，不代表未來走勢。樣本數越多越可靠。':'Based on historical data — not a prediction. More samples = more reliable.';
+  var timingSamples=curLang==='zh'?'共 '+allData.length+' 筆資料':allData.length+' data points';
+  html+='<div class="info-box" style="margin-top:8px">'+timingNote+'<br><span style="color:#aaa">'+timingSamples+'</span></div>';
   el.innerHTML=html;
 }
 
