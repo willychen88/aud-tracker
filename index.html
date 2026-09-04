@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AUD/TWD Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="匯率追蹤">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1a1a2e">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
   :root{--bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--sub:#6e6e73;--accent:#0071e3;--green:#34c759;--red:#ff3b30;--orange:#ff9500;--blue:#007aff;--border:#e5e5ea;--radius:14px}
@@ -151,9 +157,19 @@
     </div>
   </div>
   <div class="card">
-    <div class="card-title" id="calcAmtLabel"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="card-title" id="calcAmtLabel"></div>
+      <div class="chips" style="margin:0">
+        <button class="chip active" id="calcModeForward" onclick="setCalcMode('forward')" style="font-size:11px;padding:3px 10px">→</button>
+        <button class="chip" id="calcModeReverse" onclick="setCalcMode('reverse')" style="font-size:11px;padding:3px 10px">←</button>
+      </div>
+    </div>
     <div class="amt-row"><span class="amt-prefix" id="calcPrefix">NT$</span><input class="amt-input" id="calcAmt" type="number" value="200000" oninput="updateCalc()"></div>
     <div class="amt-presets" id="calcPresets"></div>
+    <div id="calcResult" style="margin-top:12px;padding:12px;background:#f7f8fa;border-radius:10px;display:none">
+      <div style="font-size:11px;color:var(--sub)" id="calcResultLabel"></div>
+      <div style="font-size:24px;font-weight:700;color:var(--green)" id="calcResultValue"></div>
+    </div>
   </div>
   <div class="card">
     <div class="card-title" id="i18n_rate_sim_title">匯率試算 — 拖動或輸入匯率</div>
@@ -187,7 +203,9 @@
     <div class="amt-row"><span class="amt-prefix" id="cmpPrefix">NT$</span><input class="amt-input" id="cmpAmt" type="number" value="200000" oninput="updateCompare()"></div>
     <div class="amt-presets" id="cmpPresets"></div>
   </div>
-  <div class="card"><div class="card-title" id="i18n_summary_table">📋 總表</div><div style="overflow-x:auto"><table class="sum-table" id="sumTable"></table></div></div>
+  <div class="card"><div class="card-title" id="i18n_summary_table">📋 總表</div><div style="overflow-x:auto"><table class="sum-table" id="sumTable"></table></div>
+    <div class="info-box" id="i18n_fee_note" style="margin-top:10px">💡 <strong>手續費欄位 = 全程總成本</strong>（已換算成 TWD）<br><strong>SHA</strong>：台灣端費用 + 中轉行/澳洲銀行從匯款中扣除的部分<br><strong>OUR</strong>：在台灣一次付清，收款人拿到完整金額，後續不再被扣</div>
+  </div>
   <div class="card">
     <div class="card-title" id="i18n_intm_adj_title">中轉行費用調整（SHA 適用）</div>
     <div style="display:flex;align-items:center;gap:8px">
@@ -233,6 +251,7 @@ const LANG = {
     preset_label:function(v){return v>=1e4?(v/1e4)+'萬':v.toLocaleString()},
     cmp_dir1:'🇹🇼 → 🇦🇺 澳洲銀行', cmp_dir2:'🇦🇺 澳洲銀行 → 🇹🇼',
     summary_table:'📋 總表',
+    fee_note:'💡 <strong>手續費欄位 = 全程總成本</strong>（已換算成 TWD）<br><strong>SHA</strong>：台灣端費用 + 中轉行/澳洲銀行從匯款中扣除的部分<br><strong>OUR</strong>：在台灣一次付清，收款人拿到完整金額，後續不再被扣',
     th_rank:'#', th_channel:'管道', th_fee:'手續費', th_received:'到手', th_diff:'差距',
     best_badge:'最划算',
     received_label_aud:'實際到手 AUD', received_label_twd:'實際到手 TWD',
@@ -290,6 +309,7 @@ const LANG = {
     preset_label:function(v){return v>=1e4?Math.round(v/1e3)+'K':v.toLocaleString()},
     cmp_dir1:'🇹🇼 → 🇦🇺 AU Bank', cmp_dir2:'🇦🇺 AU Bank → 🇹🇼',
     summary_table:'📋 Summary',
+    fee_note:'💡 <strong>Fees column = total end-to-end cost</strong> (converted to TWD)<br><strong>SHA</strong>: TW-side fees + amounts deducted by intermediary/AU bank from the transfer<br><strong>OUR</strong>: Paid upfront in Taiwan; recipient gets the full amount with nothing deducted later',
     th_rank:'#', th_channel:'Channel', th_fee:'Fees', th_received:'Received', th_diff:'Diff',
     best_badge:'Best deal',
     received_label_aud:'You receive AUD', received_label_twd:'You receive TWD',
@@ -363,7 +383,7 @@ function applyI18n(){
     i18n_timing_title:'timing_title',
     i18n_rate_sim_title:'rate_sim_title', i18n_now:'now', i18n_simulated:'simulated',
     i18n_budget_title:'budget_title',
-    i18n_summary_table:'summary_table',
+    i18n_summary_table:'summary_table', i18n_fee_note:'fee_note',
     i18n_intm_adj_title:'intm_adj_title', i18n_intm_label:'intm_label', i18n_intm_info:'intm_info',
     i18n_glossary_title:'glossary_title', i18n_glossary_body:'glossary_body'
   };
@@ -390,7 +410,7 @@ function toggleLang(){
 // ============ DATA ============
 const DATA_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSXrIBl-PouD9S8RrfLD9JtUIeFxgArwgtWFCBsl_h9dHUZ5YcQc-FER2UXFnPoi_HFyRSnUh3tPSIv/pub?output=csv';
 const RBA=['2026-09-30','2026-11-04','2026-12-09'];
-let allDataAUD=[],allDataUSD=[],allData=[],currentRate=null,lastUpdated=null,chart=null,gDir='tw2au',gCurrency='aud';
+let allDataAUD=[],allDataUSD=[],allData=[],currentRate=null,lastUpdated=null,chart=null,gDir='tw2au',gCurrency='aud',gCalcMode='forward';
 
 const BANK_SPREAD=0.004, CBA_SPREAD=0.04;
 
@@ -398,13 +418,13 @@ function buildChannels(){
   return {
     tw2au:[
       {id:'esun_sha',name:curLang==='zh'?'玉山 SHA':'E.SUN SHA',emoji:'🏦',src:curLang==='zh'?'實測':'Tested',est:false,
-        calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),a=(t-400)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:400+i*sr,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_cable'),'TWD 400'],[T('f_intm_au'),'AUD '+i]]}}},
+        calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),a=(t-400)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:400+i*sr,twFee:400,fxFee:i*sr,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_cable'),'TWD 400'],[T('f_intm_au'),'AUD '+i]]}}},
       {id:'esun_our',name:curLang==='zh'?'玉山 OUR':'E.SUN OUR',emoji:'🏦',src:curLang==='zh'?'估算':'Estimated',est:true,
-        calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),a=(t-1000)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:1000,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_cable_x2'),'~TWD 1,000'],[T('f_intm_au_pay'),T('sender_pays')]]}}},
+        calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),a=(t-1000)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:1000,twFee:1000,fxFee:0,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_cable_x2'),'~TWD 1,000'],[T('f_intm_au_pay'),T('sender_pays')]]}}},
       {id:'tcb_sha',name:curLang==='zh'?'合庫 SHA':'TCB SHA',emoji:'🏛️',src:curLang==='zh'?'官方':'Official',est:true,
-        calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(600,Math.max(130,Math.round(t*.00025))),a=(t-f-220)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:f+220+i*sr,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_pct'),'TWD '+f],[T('f_cable'),'TWD 220'],[T('f_intm_au'),'AUD '+i]]}}},
+        calc:(t,r,i)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(600,Math.max(130,Math.round(t*.00025))),a=(t-f-220)/sr-i;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:f+220+i*sr,twFee:f+220,fxFee:i*sr,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_pct'),'TWD '+f],[T('f_cable'),'TWD 220'],[T('f_intm_au'),'AUD '+i]]}}},
       {id:'tcb_our',name:curLang==='zh'?'合庫 OUR':'TCB OUR',emoji:'🏛️',src:curLang==='zh'?'官方':'Official',est:true,
-        calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(600,Math.max(130,Math.round(t*.00025))),ourSur=600,a=(t-f-220-ourSur)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:f+220+ourSur,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_pct'),'TWD '+f],[T('f_cable'),'TWD 220'],[curLang==='zh'?'OUR國外費用(估)':'OUR surcharge (est)','~TWD 600'],[T('f_intm_au_pay'),T('sender_pays')]]}}},
+        calc:(t,r)=>{const sr=r*(1+BANK_SPREAD),f=Math.min(600,Math.max(130,Math.round(t*.00025))),ourSur=600,a=(t-f-220-ourSur)/sr;return{received:Math.max(0,a),unit:'AUD',rateUsed:sr.toFixed(4)+` (${T('sell_rate')})`,totalFee:f+220+ourSur,twFee:f+220+ourSur,fxFee:0,feeUnit:'TWD',fees:[[T('f_sell_rate'),T('f_mid_plus')],[T('f_fee_pct'),'TWD '+f],[T('f_cable'),'TWD 220'],[curLang==='zh'?'OUR國外費用(估)':'OUR surcharge (est)','~TWD 600'],[T('f_intm_au_pay'),T('sender_pays')]]}}},
       {id:'wise',name:'Wise',emoji:'🌐',src:curLang==='zh'?'網路':'Web',est:true,
         calc:(t,r)=>{const f=t*.0075,a=(t-f)/r;return{received:Math.max(0,a),unit:'AUD',rateUsed:r.toFixed(4)+` (${T('mid_rate')})`,totalFee:f,feeUnit:'TWD',fees:[[T('f_fee_wise'),'TWD '+Math.round(f)+` (${T('est_label')})`],[T('f_rate_mid'),T('f_rate_mid_val')],[T('f_no_intm'),T('f_no_intm_val')]]}}}
     ],
@@ -512,6 +532,26 @@ function renderHeatmap(){
 }
 
 // === DIRECTION SYNC ===
+function setCalcMode(mode){
+  gCalcMode=mode;
+  document.getElementById('calcModeForward').classList.toggle('active',mode==='forward');
+  document.getElementById('calcModeReverse').classList.toggle('active',mode==='reverse');
+  var tw=gDir==='tw2au';var isUSD=gCurrency==='usd';
+  var foreignLabel=isUSD?'USD':'AUD';
+  if(mode==='forward'){
+    // Forward: input send currency → calc receive
+    document.getElementById('calcAmtLabel').textContent=tw?(curLang==='zh'?'匯款金額 (TWD)':'Send Amount (TWD)'):(curLang==='zh'?'匯款金額 ('+foreignLabel+')':'Send Amount ('+foreignLabel+')');
+    document.getElementById('calcPrefix').textContent=tw?'NT$':(isUSD?'US$':'A$');
+    document.getElementById('calcAmt').value=tw?'200000':(isUSD?'3000':'5000');
+  }else{
+    // Reverse: input target receive → calc how much to send
+    document.getElementById('calcAmtLabel').textContent=tw?(curLang==='zh'?'目標到手 ('+foreignLabel+')':'Target Receive ('+foreignLabel+')'):(curLang==='zh'?'目標到手 (TWD)':'Target Receive (TWD)');
+    document.getElementById('calcPrefix').textContent=tw?(isUSD?'US$':'A$'):'NT$';
+    document.getElementById('calcAmt').value=tw?(isUSD?'3000':'5000'):'200000';
+  }
+  renderCalcPresets();updateCalc();
+}
+
 function setDir(dir){
   gDir=dir;var tw=dir==='tw2au';var isUSD=gCurrency==='usd';
   document.querySelectorAll('.dir-toggle').forEach(function(tgl){var btns=tgl.querySelectorAll('.dir-btn');btns[0].classList.toggle('active',tw);btns[1].classList.toggle('active',!tw)});
@@ -537,17 +577,46 @@ function renderCmpPresets(){var p=gDir==='tw2au'?[5e4,1e5,2e5,3e5]:[2e3,5e3,8e3,
 
 function updateCalc(){
   if(!currentRate)return;var amt=parseFloat(document.getElementById('calcAmt').value)||0,r=currentRate,tw=gDir==='tw2au';
-  var isUSD=gCurrency==='usd';
+  var isUSD=gCurrency==='usd';var rev=gCalcMode==='reverse';
   var simR=parseFloat(document.getElementById('rateInput').value)||r;
   document.getElementById('rateSlider').value=simR;
   var bankRate=isUSD?r:(tw?r*(1+BANK_SPREAD):r*(1-CBA_SPREAD));
   var bankSimR=isUSD?simR:(tw?simR*(1+BANK_SPREAD):simR*(1-CBA_SPREAD));
+  var foreignPf=isUSD?'US$':'A$';
+
+  // Reverse calc: show how much to send
+  var resEl=document.getElementById('calcResult');
+  if(rev){
+    // amt is target receive amount
+    var needToSend,sendUnit,recvUnit;
+    if(tw){
+      // tw2au reverse: want X AUD, need ? TWD
+      needToSend=Math.round(amt*bankRate);
+      sendUnit='NT$';recvUnit=foreignPf;
+    }else{
+      // au2tw reverse: want X TWD, need ? AUD
+      needToSend=Math.round(amt/bankRate);
+      sendUnit=foreignPf;recvUnit='NT$';
+    }
+    resEl.style.display='block';
+    document.getElementById('calcResultLabel').textContent=curLang==='zh'?'需要匯出約':'You need to send approx.';
+    document.getElementById('calcResultValue').textContent=sendUnit+needToSend.toLocaleString();
+  }else{
+    resEl.style.display='none';
+  }
+
+  // Forward calc (rate sim section always uses forward logic)
   var nowRes=tw?amt/bankRate:amt*bankRate, simRes=tw?amt/bankSimR:amt*bankSimR;
-  var unit=tw?(isUSD?'US$':'A$'):'NT$';
+  if(rev){
+    // In reverse mode, recalc sim as: how much to send at simulated rate
+    nowRes=tw?amt*bankRate:amt/bankRate;
+    simRes=tw?amt*bankSimR:amt/bankSimR;
+  }
+  var unit=rev?(tw?'NT$':foreignPf):(tw?foreignPf:'NT$');
   document.getElementById('simNowR').textContent=r.toFixed(2);document.getElementById('simIfR').textContent=simR.toFixed(2);
   document.getElementById('simNowV').textContent=unit+Math.round(nowRes).toLocaleString();
   document.getElementById('simIfV').textContent=unit+Math.round(simRes).toLocaleString();
-  var diff=nowRes-simRes,el=document.getElementById('simDiff');
+  var diff=rev?(simRes-nowRes):(nowRes-simRes),el=document.getElementById('simDiff');
   var absDiff=Math.abs(Math.round(diff)).toLocaleString();
   if(diff>0){
     el.textContent=curLang==='zh'?'現在換多拿 '+unit+absDiff:'Better now by '+unit+absDiff;
@@ -559,7 +628,7 @@ function updateCalc(){
     el.textContent=curLang==='zh'?'相同':'Same';
     el.style.background='#f5f5f5';el.style.color='#666';
   }
-  // Rate note - direct language check
+  // Rate note
   if(isUSD){
     document.getElementById('calcRateNote').innerHTML=curLang==='zh'?'使用<strong>中間匯率</strong>（銀行實際匯率會有價差）':'Using <strong>mid-market rate</strong> (bank rates may differ)';
   }else if(tw){
@@ -567,7 +636,7 @@ function updateCalc(){
   }else{
     document.getElementById('calcRateNote').innerHTML=curLang==='zh'?'使用銀行<strong>買入匯率</strong>（中間價 '+r.toFixed(2)+' - spread）':'Using bank <strong>buy rate</strong> (mid '+r.toFixed(2)+' - spread)';
   }
-  // Budget - direct language check
+  // Budget
   var bA=1e5/r,bA1=1e5/(r+1),bAStr=Math.round(bA).toLocaleString(),diffStr=Math.round(bA-bA1);
   document.getElementById('budgetImpact').innerHTML=curLang==='zh'
     ?'月生活費 TWD 10 萬 ≈ <strong>A$'+bAStr+'</strong>。匯率漲 1 塊 → 每月多花 <strong style="color:var(--red)">A$'+diffStr+'</strong>'
@@ -589,7 +658,9 @@ function updateCompare(){
   let th=`<tr><th>${T('th_rank')}</th><th>${T('th_channel')}</th><th>${T('th_fee')}</th><th>${T('th_received')}${u}</th><th>${T('th_diff')}</th></tr>`;
   const rows=results.map((ch,i)=>{const v=isAUD?ch.result.received.toFixed(2):Math.round(ch.result.received).toLocaleString();
     const diff=i===0?'—':('-'+pf+(isAUD?(results[0].result.received-ch.result.received).toFixed(2):Math.round(results[0].result.received-ch.result.received).toLocaleString()));
-    const fee=ch.result.totalFee!=null?'NT$'+Math.round(ch.result.totalFee).toLocaleString()+(ch.result.feeNote?' <span class="est">'+ch.result.feeNote+'</span>':''):'—';
+    const feeSplit=ch.result.twFee!=null&&ch.result.fxFee!=null&&ch.result.fxFee>0
+      ?'<div style="font-size:9px;color:#aaa;margin-top:1px">'+(curLang==='zh'?'台'+Math.round(ch.result.twFee)+'+外'+Math.round(ch.result.fxFee):'TW '+Math.round(ch.result.twFee)+'+FX '+Math.round(ch.result.fxFee))+'</div>':'';
+    const fee=ch.result.totalFee!=null?'NT$'+Math.round(ch.result.totalFee).toLocaleString()+(ch.result.feeNote?' <span class="est">'+ch.result.feeNote+'</span>':'')+feeSplit:'—';
     const clr=i===0?'var(--green)':'var(--red)';return`<tr><td><span class="rank rank-${Math.min(i+1,3)}">${i+1}</span></td><td>${ch.emoji} ${ch.name}${ch.est?' <span class="est">'+T('est_label')+'</span>':''}</td><td style="font-size:10px">${fee}</td><td style="font-weight:600">${pf}${v}</td><td style="color:${clr}">${diff}</td></tr>`}).join('');
   document.getElementById('sumTable').innerHTML=th+rows;
 
@@ -677,6 +748,8 @@ function switchTab(t){document.querySelectorAll('.tab-content').forEach(el=>el.c
   if(t==='calc'){renderCalcPresets();updateCalc()}if(t==='compare'){renderCmpPresets();updateCompare()}}
 
 renderCalcPresets();loadData();
+// PWA Service Worker
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){})}
 </script>
 </body>
 </html>
